@@ -545,24 +545,30 @@ function generateInvoicePdf(form,sender,subtotal,tax,taxType){
 <style>
 @page{size:A4;margin:0;}
 *{margin:0;padding:0;box-sizing:border-box;}
-body{width:210mm;min-height:297mm;padding:12mm 17mm 10mm;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+html,body{width:210mm;height:297mm;overflow:hidden;}
+body{padding:12mm 17mm 10mm;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 table{border-collapse:collapse;width:100%;}
-td,th{border:0.5pt solid #333;padding:2mm 3mm;font-size:9pt;height:6.5mm;}
-th{font-weight:700;font-size:8.5pt;text-align:center;}
+td,th{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6.5mm;}
+th{font-weight:700;font-size:8.5pt;text-align:center;background:#e8e8e8;color:#1a1a1a;}
 .r{text-align:right;} .b{font-weight:bold;}
 .header-tbl{width:100%;border:none;} .header-tbl td{border:none;padding:0;}
 .summary-tbl{width:40%;margin-left:60%;}
-@media print{body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}}
+@media print{
+  html,body{width:210mm;height:297mm;overflow:hidden;}
+  body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  th{background:#e8e8e8 !important;color:#1a1a1a !important;}
+  td,th{border:1px solid #555 !important;}
+}
 </style></head><body>
 <div style="text-align:right;font-size:9pt;font-weight:bold;">${fmtJpDate(form.date)}</div>
 <div style="text-align:right;font-size:9pt;font-weight:bold;margin-top:2.5mm;">請求番号 : ${form.invoiceNumber}</div>
-<div style="text-align:center;font-size:22pt;font-weight:900;margin:8mm 0 8mm;">請求書</div>
+<div style="text-align:center;font-size:22pt;font-weight:900;margin:6mm 0 6mm;">請求書</div>
 <table class="header-tbl"><tr><td style="vertical-align:top;width:55%;">
-  <div style="font-size:11pt;font-weight:bold;border-bottom:0.8pt solid #1a1a1a;padding-bottom:2mm;display:inline-block;min-width:60mm;">${form.recipientName}<span style="margin-left:12mm;">御中</span></div>
-  <div style="font-size:10pt;font-weight:bold;margin-top:5mm;">件名：${form.subject}</div>
-  <div style="font-size:9pt;margin-top:3mm;">下記のとおりご請求申し上げます。</div>
-  <div style="margin-top:5mm;"><span style="font-size:10pt;font-weight:900;">ご請求金額</span><span style="font-size:13pt;font-weight:900;border-bottom:0.8pt solid #1a1a1a;padding:1mm 5mm;margin-left:5mm;">¥${displayTotal.toLocaleString()}-</span></div>
-  <div style="font-size:9pt;font-weight:bold;margin-top:4mm;">お支払い期限　${fmtJpDate(form.paymentDeadline)}</div>
+  <div style="border-bottom:0.8pt solid #1a1a1a;padding-bottom:2mm;display:inline-flex;justify-content:space-between;min-width:55mm;"><span style="font-size:11pt;font-weight:bold;">${form.recipientName}</span><span style="font-size:11pt;font-weight:bold;margin-left:10mm;">御中</span></div>
+  <div style="font-size:10pt;font-weight:bold;margin-top:4mm;">件名：${form.subject}</div>
+  <div style="font-size:9pt;margin-top:2mm;">下記のとおりご請求申し上げます。</div>
+  <div style="margin-top:4mm;display:inline-block;border-bottom:0.8pt solid #1a1a1a;padding-bottom:1mm;"><span style="font-size:10pt;font-weight:900;">ご請求金額</span><span style="font-size:13pt;font-weight:900;padding:0 2mm 0 5mm;">¥${displayTotal.toLocaleString()}-</span></div>
+  <div style="font-size:9pt;font-weight:bold;margin-top:3mm;">お支払い期限　${fmtJpDate(form.paymentDeadline)}</div>
 </td><td style="vertical-align:top;width:45%;padding-left:10mm;">
   <div style="font-size:8.5pt;line-height:1.7;">
     <div style="font-weight:bold;font-size:9pt;">${sender.company}</div>
@@ -574,8 +580,8 @@ th{font-weight:700;font-size:8.5pt;text-align:center;}
     <div>${sender.registration}</div>
   </div>
 </td></tr></table>
-<table style="margin-top:8mm;">
-  <tr style="background:#1a1a1a;color:#fff;">
+<table style="margin-top:6mm;">
+  <tr>
     <th style="width:55%;">品番・品名</th><th style="width:12%;">数量</th><th style="width:16%;">単価</th><th style="width:17%;">金額</th>
   </tr>
   ${items.map(it=>`<tr><td>${it.name}</td><td class="r">${it.qty||1}</td><td class="r">${parseInt(it.amount).toLocaleString()}</td><td class="r">${(parseInt(it.amount)*(it.qty||1)).toLocaleString()}</td></tr>`).join('')}
@@ -586,7 +592,7 @@ th{font-weight:700;font-size:8.5pt;text-align:center;}
   <tr><td>${taxLabel}</td><td class="r">${taxDisplay}</td></tr>
   <tr><td class="b">合計</td><td class="r b">${displayTotal.toLocaleString()}</td></tr>
 </table>
-<div style="margin-top:6mm;font-size:9pt;">
+<div style="margin-top:5mm;font-size:9pt;">
   <div style="font-weight:bold;margin-bottom:1.5mm;">お振込先：</div>
   <div>${sender.bank}</div>
 </div>
