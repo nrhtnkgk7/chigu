@@ -552,31 +552,31 @@ async function generateInvoicePdf(form,sender,subtotal,tax,taxType,setGen){
     await loadHtml2Pdf();
 
     const container=document.createElement('div');
-    container.style.cssText='position:absolute;left:-9999px;top:0;';
-    container.innerHTML=`<div id="pdf-invoice" style="width:176mm;background:#fff;box-sizing:border-box;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;">
-<style>.items-tbl{border-collapse:collapse;width:100%;}.items-tbl td,.items-tbl th{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}.items-tbl th{font-weight:700;font-size:8.5pt;text-align:center;background:#e8e8e8;color:#1a1a1a;}.summary-tbl{border-collapse:collapse;width:40%;margin-left:60%;}.summary-tbl td{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}.r{text-align:right;}.b{font-weight:bold;}</style>
-<div style="text-align:right;font-size:9pt;font-weight:bold;">${fmtJpDate(form.date)}</div>
-<div style="text-align:right;font-size:9pt;font-weight:bold;margin-top:2mm;">請求番号 : ${form.invoiceNumber}</div>
-<div style="text-align:center;font-size:20pt;font-weight:900;margin:5mm 0 5mm;">請求書</div>
+    container.style.cssText='position:absolute;left:0;top:0;opacity:0;pointer-events:none;';
+    container.innerHTML=`<div id="pdf-invoice" style="width:794px;padding:38px 64px 30px;background:#fff;box-sizing:border-box;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;">
+<style>.items-tbl{border-collapse:collapse;width:100%;}.items-tbl td,.items-tbl th{border:1px solid #555;padding:6px 10px;font-size:12px;height:24px;}.items-tbl th{font-weight:700;font-size:11px;text-align:center;background:#e8e8e8;color:#1a1a1a;}.summary-tbl{border-collapse:collapse;width:40%;margin-left:60%;}.summary-tbl td{border:1px solid #555;padding:6px 10px;font-size:12px;height:24px;}.r{text-align:right;}.b{font-weight:bold;}</style>
+<div style="text-align:right;font-size:12px;font-weight:bold;">${fmtJpDate(form.date)}</div>
+<div style="text-align:right;font-size:12px;font-weight:bold;margin-top:6px;">請求番号 : ${form.invoiceNumber}</div>
+<div style="text-align:center;font-size:26px;font-weight:900;margin:18px 0 16px;">請求書</div>
 <div style="display:flex;justify-content:space-between;align-items:flex-start;">
   <div style="flex:1;">
-    <div style="border-bottom:0.8pt solid #1a1a1a;padding-bottom:2mm;display:inline-flex;justify-content:space-between;min-width:55mm;"><span style="font-size:11pt;font-weight:bold;">${form.recipientName}</span><span style="font-size:11pt;font-weight:bold;margin-left:10mm;">御中</span></div>
-    <div style="font-size:10pt;font-weight:bold;margin-top:4mm;">件名：${form.subject}</div>
-    <div style="font-size:9pt;margin-top:2mm;">下記のとおりご請求申し上げます。</div>
-    <div style="margin-top:3mm;display:inline-block;border-bottom:0.8pt solid #1a1a1a;padding-bottom:1mm;"><span style="font-size:10pt;font-weight:900;">ご請求金額</span><span style="font-size:13pt;font-weight:900;padding:0 2mm 0 5mm;">¥${displayTotal.toLocaleString()}-</span></div>
-    <div style="font-size:9pt;font-weight:bold;margin-top:3mm;">お支払い期限　${fmtJpDate(form.paymentDeadline)}</div>
+    <div style="border-bottom:1px solid #1a1a1a;padding-bottom:6px;display:inline-flex;justify-content:space-between;min-width:220px;"><span style="font-size:14px;font-weight:bold;">${form.recipientName}</span><span style="font-size:14px;font-weight:bold;margin-left:36px;">御中</span></div>
+    <div style="font-size:13px;font-weight:bold;margin-top:14px;">件名：${form.subject}</div>
+    <div style="font-size:12px;margin-top:8px;">下記のとおりご請求申し上げます。</div>
+    <div style="margin-top:10px;display:inline-block;border-bottom:1px solid #1a1a1a;padding-bottom:3px;"><span style="font-size:13px;font-weight:900;">ご請求金額</span><span style="font-size:17px;font-weight:900;padding:0 6px 0 16px;">¥${displayTotal.toLocaleString()}-</span></div>
+    <div style="font-size:12px;font-weight:bold;margin-top:10px;">お支払い期限　${fmtJpDate(form.paymentDeadline)}</div>
   </div>
-  <div style="width:50mm;font-size:8.5pt;line-height:1.7;">
-    <div style="font-weight:bold;font-size:9pt;">${sender.company}</div>
+  <div style="width:190px;font-size:11px;line-height:1.7;">
+    <div style="font-weight:bold;font-size:12px;">${sender.company}</div>
     <div>${sender.representative}</div>
-    <div style="margin-top:2mm;">${sender.zip}</div>
+    <div style="margin-top:6px;">${sender.zip}</div>
     <div>${sender.address}</div>
-    <div style="margin-top:2mm;">${sender.tel}</div>
+    <div style="margin-top:6px;">${sender.tel}</div>
     <div>${sender.email}</div>
     <div>${sender.registration}</div>
   </div>
 </div>
-<table class="items-tbl" style="margin-top:5mm;">
+<table class="items-tbl" style="margin-top:16px;">
   <tr><th style="width:55%;">品番・品名</th><th style="width:12%;">数量</th><th style="width:16%;">単価</th><th style="width:17%;">金額</th></tr>
   ${items.map(it=>`<tr><td>${it.name}</td><td class="r">${it.qty||1}</td><td class="r">${parseInt(it.amount).toLocaleString()}</td><td class="r">${(parseInt(it.amount)*(it.qty||1)).toLocaleString()}</td></tr>`).join('')}
   ${Array(emptyRows).fill('<tr><td>&nbsp;</td><td></td><td></td><td></td></tr>').join('')}
@@ -586,21 +586,21 @@ async function generateInvoicePdf(form,sender,subtotal,tax,taxType,setGen){
   <tr><td>${taxLabel}</td><td class="r">${taxDisplay}</td></tr>
   <tr><td class="b">合計</td><td class="r b">${displayTotal.toLocaleString()}</td></tr>
 </table>
-<div style="margin-top:4mm;font-size:9pt;">
-  <div style="font-weight:bold;margin-bottom:1.5mm;">お振込先：</div>
+<div style="margin-top:14px;font-size:12px;">
+  <div style="font-weight:bold;margin-bottom:4px;">お振込先：</div>
   <div>${sender.bank}</div>
 </div>
 </div>`;
 
     document.body.appendChild(container);
     await document.fonts.ready;
-    await new Promise(r=>setTimeout(r,500));
+    await new Promise(r=>setTimeout(r,600));
 
     const el=container.querySelector('#pdf-invoice');
     await window.html2pdf().from(el).set({
-      margin:[15,17,10,17],
+      margin:0,
       filename:fn+'.pdf',
-      html2canvas:{scale:2,useCORS:true,letterRendering:true,scrollY:0,windowWidth:el.scrollWidth},
+      html2canvas:{scale:2,useCORS:true,letterRendering:true,scrollY:0,width:794,windowWidth:794},
       jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
       pagebreak:{mode:['avoid-all']}
     }).save();
