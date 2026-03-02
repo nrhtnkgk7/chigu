@@ -552,9 +552,9 @@ async function generateInvoicePdf(form,sender,subtotal,tax,taxType,setGen){
     await loadHtml2Pdf();
 
     const container=document.createElement('div');
-    container.style.cssText='position:fixed;left:-9999px;top:0;z-index:-1;';
-    container.innerHTML=`<div id="pdf-invoice" style="width:210mm;padding:10mm 17mm 8mm;background:#fff;box-sizing:border-box;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;">
-<style>.items-tbl td,.items-tbl th{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}.items-tbl th{font-weight:700;font-size:8.5pt;text-align:center;background:#e8e8e8;color:#1a1a1a;}.summary-tbl td{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}.r{text-align:right;}.b{font-weight:bold;}.summary-tbl{width:40%;margin-left:60%;}table{border-collapse:collapse;width:100%;}</style>
+    container.style.cssText='position:absolute;left:-9999px;top:0;';
+    container.innerHTML=`<div id="pdf-invoice" style="width:176mm;background:#fff;box-sizing:border-box;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;">
+<style>.items-tbl{border-collapse:collapse;width:100%;}.items-tbl td,.items-tbl th{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}.items-tbl th{font-weight:700;font-size:8.5pt;text-align:center;background:#e8e8e8;color:#1a1a1a;}.summary-tbl{border-collapse:collapse;width:40%;margin-left:60%;}.summary-tbl td{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}.r{text-align:right;}.b{font-weight:bold;}</style>
 <div style="text-align:right;font-size:9pt;font-weight:bold;">${fmtJpDate(form.date)}</div>
 <div style="text-align:right;font-size:9pt;font-weight:bold;margin-top:2mm;">請求番号 : ${form.invoiceNumber}</div>
 <div style="text-align:center;font-size:20pt;font-weight:900;margin:5mm 0 5mm;">請求書</div>
@@ -598,10 +598,11 @@ async function generateInvoicePdf(form,sender,subtotal,tax,taxType,setGen){
 
     const el=container.querySelector('#pdf-invoice');
     await window.html2pdf().from(el).set({
-      margin:0,
+      margin:[15,17,10,17],
       filename:fn+'.pdf',
-      html2canvas:{scale:2,useCORS:true,letterRendering:true},
-      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+      html2canvas:{scale:2,useCORS:true,letterRendering:true,scrollY:0,windowWidth:el.scrollWidth},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'},
+      pagebreak:{mode:['avoid-all']}
     }).save();
 
     document.body.removeChild(container);
