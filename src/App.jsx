@@ -553,7 +553,7 @@ async function generateInvoicePdf(form,sender,subtotal,tax,taxType,setGen){
 
     const container=document.createElement('div');
     container.style.cssText='position:fixed;left:-9999px;top:0;z-index:-1;';
-    container.innerHTML=`<div id="pdf-invoice" style="width:210mm;height:296mm;padding:10mm 17mm 8mm;background:#fff;box-sizing:border-box;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;">
+    container.innerHTML=`<div id="pdf-invoice" style="width:210mm;padding:10mm 17mm 8mm;background:#fff;box-sizing:border-box;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;">
 <style>.items-tbl td,.items-tbl th{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}.items-tbl th{font-weight:700;font-size:8.5pt;text-align:center;background:#e8e8e8;color:#1a1a1a;}.summary-tbl td{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}.r{text-align:right;}.b{font-weight:bold;}.summary-tbl{width:40%;margin-left:60%;}table{border-collapse:collapse;width:100%;}</style>
 <div style="text-align:right;font-size:9pt;font-weight:bold;">${fmtJpDate(form.date)}</div>
 <div style="text-align:right;font-size:9pt;font-weight:bold;margin-top:2mm;">請求番号 : ${form.invoiceNumber}</div>
@@ -611,14 +611,24 @@ async function generateInvoicePdf(form,sender,subtotal,tax,taxType,setGen){
 
 
 function InvoicePage({sender,onOpenSenderSettings}){
-  const initForm=()=>{const d=todayStr();const num=d.replace(/-/g,'')+'01';return{date:d,invoiceNumber:num,paymentDeadline:'',recipientName:'',subject:'',taxType:'inclusive',items:[{name:'',qty:1,amount:''}]}};
+  const getNextMonthEnd=()=>{const now=new Date();const y=now.getMonth()===11?now.getFullYear()+1:now.getFullYear();const m=now.getMonth()===11?1:now.getMonth()+2;const d=new Date(y,m,0);return`${y}-${String(m).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`};
+  const initForm=()=>{const d=todayStr();const num=d.replace(/-/g,'')+'01';return{date:d,invoiceNumber:num,paymentDeadline:getNextMonthEnd(),recipientName:'',subject:'',taxType:'inclusive',items:[{name:'',qty:1,amount:''}]}};
   const [form,setForm]=useState(initForm);
   const [gen,setGen]=useState(false);
-  const set=(k,v)=>setForm(p=>({...p,[k]:v}));
-  const setItem=(i,k,v)=>setForm(p=>{const items=[...p.items];items[i]={...items[i],[k]:v};return{...p,items}});
+  const [itemEdited,setItemEdited]=useState(false);
+  const set=(k,v)=>{
+    setForm(p=>{
+      const next={...p,[k]:v};
+      if(k==='subject'&&!itemEdited&&p.items.length>0){
+        next.items=[{...p.items[0],name:v},...p.items.slice(1)];
+      }
+      return next;
+    });
+  };
+  const setItem=(i,k,v)=>{if(i===0&&k==='name')setItemEdited(true);setForm(p=>{const items=[...p.items];items[i]={...items[i],[k]:v};return{...p,items}})};
   const addItem=()=>setForm(p=>({...p,items:[...p.items,{name:'',qty:1,amount:''}]}));
   const rmItem=i=>setForm(p=>({...p,items:p.items.filter((_,j)=>j!==i)}));
-  const resetForm=()=>setForm(initForm());
+  const resetForm=()=>{setForm(initForm());setItemEdited(false)};
   const subtotal=form.items.reduce((s,it)=>s+((parseInt(it.amount)||0)*(parseInt(it.qty)||1)),0);
   const tax=form.taxType==="inclusive"?Math.floor(subtotal/11):Math.floor(subtotal*0.1);
   const displayTotal=form.taxType==="inclusive"?subtotal:subtotal+tax;
