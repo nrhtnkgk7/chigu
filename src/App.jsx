@@ -532,7 +532,14 @@ function MonthlyStats({cases,currentMonth,setCurrentMonth,settings,onOpenSetting
 /* ── Invoice PDF ── */
 const fmtJpDate=(ds)=>{if(!ds)return'';const d=parseLocal(ds);if(!d)return'';return`${d.getFullYear()}年${d.getMonth()+1}月${d.getDate()}日`};
 
-function generateInvoicePdf(form,sender,subtotal,tax,taxType){
+const loadHtml2Pdf=()=>new Promise((res,rej)=>{
+  if(window.html2pdf){res();return}
+  const s=document.createElement('script');
+  s.src='https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
+  s.onload=res;s.onerror=rej;document.head.appendChild(s);
+});
+
+async function generateInvoicePdf(form,sender,subtotal,tax,taxType,setGen){
   const items=form.items.filter(it=>it.name&&it.amount);
   const emptyRows=Math.max(0,10-items.length);
   const taxLabel=taxType==="inclusive"?"消費税 (10% 内税)":"消費税 (10%)";
@@ -540,33 +547,16 @@ function generateInvoicePdf(form,sender,subtotal,tax,taxType){
   const taxDisplay=taxType==="inclusive"?"("+tax.toLocaleString()+")":tax.toLocaleString();
   const fn=`${form.recipientName}様_${form.invoiceNumber}`;
 
-  const html=`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${fn}</title>
-<meta name="format-detection" content="telephone=no,date=no,address=no,email=no">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-@page{size:A4;margin:0;}
-*{margin:0;padding:0;box-sizing:border-box;}
-html,body{width:210mm;height:296mm;overflow:hidden;}
-body{font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-a{color:#1a1a1a !important;text-decoration:none !important;pointer-events:none;}
-table{border-collapse:collapse;width:100%;}
-.items-tbl td,.items-tbl th{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}
-.items-tbl th{font-weight:700;font-size:8.5pt;text-align:center;background:#e8e8e8;color:#1a1a1a;}
-.summary-tbl td{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}
-.r{text-align:right;} .b{font-weight:bold;}
-.summary-tbl{width:40%;margin-left:60%;}
-@media print{
-  html,body{width:210mm;height:296mm;overflow:hidden;}
-  body{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
-  .items-tbl th{background:#e8e8e8 !important;color:#1a1a1a !important;}
-  .items-tbl td,.items-tbl th{border:1px solid #555 !important;}
-  .summary-tbl td{border:1px solid #555 !important;}
-}
-</style></head><body>
-<div style="text-align:center;padding:20mm;font-family:sans-serif;color:#888;font-size:14pt;" id="loading">PDF生成中...</div>
-<div id="invoice" style="width:210mm;height:296mm;padding:10mm 17mm 8mm;background:#fff;box-sizing:border-box;">
+  setGen(true);
+  try{
+    await loadHtml2Pdf();
+
+    const container=document.createElement('div');
+    container.style.cssText='position:fixed;left:-9999px;top:0;z-index:-1;';
+    container.innerHTML=`<div id="pdf-invoice" style="width:210mm;height:296mm;padding:10mm 17mm 8mm;background:#fff;box-sizing:border-box;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;">
+<style>.items-tbl td,.items-tbl th{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}.items-tbl th{font-weight:700;font-size:8.5pt;text-align:center;background:#e8e8e8;color:#1a1a1a;}.summary-tbl td{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}.r{text-align:right;}.b{font-weight:bold;}.summary-tbl{width:40%;margin-left:60%;}table{border-collapse:collapse;width:100%;}</style>
 <div style="text-align:right;font-size:9pt;font-weight:bold;">${fmtJpDate(form.date)}</div>
-<div style="text-align:right;font-size:9pt;font-weight:bold;margin-top:2mm;">請求番号 : <span>${form.invoiceNumber}</span></div>
+<div style="text-align:right;font-size:9pt;font-weight:bold;margin-top:2mm;">請求番号 : ${form.invoiceNumber}</div>
 <div style="text-align:center;font-size:20pt;font-weight:900;margin:5mm 0 5mm;">請求書</div>
 <div style="display:flex;justify-content:space-between;align-items:flex-start;">
   <div style="flex:1;">
@@ -581,15 +571,13 @@ table{border-collapse:collapse;width:100%;}
     <div>${sender.representative}</div>
     <div style="margin-top:2mm;">${sender.zip}</div>
     <div>${sender.address}</div>
-    <div style="margin-top:2mm;"><span>${sender.tel}</span></div>
+    <div style="margin-top:2mm;">${sender.tel}</div>
     <div>${sender.email}</div>
     <div>${sender.registration}</div>
   </div>
 </div>
 <table class="items-tbl" style="margin-top:5mm;">
-  <tr>
-    <th style="width:55%;">品番・品名</th><th style="width:12%;">数量</th><th style="width:16%;">単価</th><th style="width:17%;">金額</th>
-  </tr>
+  <tr><th style="width:55%;">品番・品名</th><th style="width:12%;">数量</th><th style="width:16%;">単価</th><th style="width:17%;">金額</th></tr>
   ${items.map(it=>`<tr><td>${it.name}</td><td class="r">${it.qty||1}</td><td class="r">${parseInt(it.amount).toLocaleString()}</td><td class="r">${(parseInt(it.amount)*(it.qty||1)).toLocaleString()}</td></tr>`).join('')}
   ${Array(emptyRows).fill('<tr><td>&nbsp;</td><td></td><td></td><td></td></tr>').join('')}
 </table>
@@ -602,33 +590,30 @@ table{border-collapse:collapse;width:100%;}
   <div style="font-weight:bold;margin-bottom:1.5mm;">お振込先：</div>
   <div>${sender.bank}</div>
 </div>
-</div>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
-<script>
-window.onload=function(){
-  document.title="${fn}";
-  var el=document.getElementById('invoice');
-  html2pdf().from(el).set({
-    margin:0,
-    filename:"${fn}.pdf",
-    html2canvas:{scale:2,useCORS:true,letterRendering:true},
-    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
-  }).save().then(function(){
-    setTimeout(function(){window.close()},1000);
-  });
-};
-<\/script>
-</body></html>`;
+</div>`;
 
-  const w=window.open('','_blank');
-  if(w){w.document.write(html);w.document.close()}
-  else{alert('ポップアップがブロックされました。ポップアップを許可してからもう一度お試しください。')}
+    document.body.appendChild(container);
+    await document.fonts.ready;
+    await new Promise(r=>setTimeout(r,500));
+
+    const el=container.querySelector('#pdf-invoice');
+    await window.html2pdf().from(el).set({
+      margin:0,
+      filename:fn+'.pdf',
+      html2canvas:{scale:2,useCORS:true,letterRendering:true},
+      jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+    }).save();
+
+    document.body.removeChild(container);
+  }catch(e){alert('PDF生成に失敗しました: '+e.message)}
+  setGen(false);
 }
 
 
 function InvoicePage({sender,onOpenSenderSettings}){
   const initForm=()=>{const d=todayStr();const num=d.replace(/-/g,'')+'01';return{date:d,invoiceNumber:num,paymentDeadline:'',recipientName:'',subject:'',taxType:'inclusive',items:[{name:'',qty:1,amount:''}]}};
   const [form,setForm]=useState(initForm);
+  const [gen,setGen]=useState(false);
   const set=(k,v)=>setForm(p=>({...p,[k]:v}));
   const setItem=(i,k,v)=>setForm(p=>{const items=[...p.items];items[i]={...items[i],[k]:v};return{...p,items}});
   const addItem=()=>setForm(p=>({...p,items:[...p.items,{name:'',qty:1,amount:''}]}));
@@ -640,7 +625,7 @@ function InvoicePage({sender,onOpenSenderSettings}){
   const generate=()=>{
     if(!form.recipientName){alert('請求先を入力してください');return}
     if(!form.subject){alert('件名を入力してください');return}
-    generateInvoicePdf(form,sender,subtotal,tax,form.taxType);
+    generateInvoicePdf(form,sender,subtotal,tax,form.taxType,setGen);
   };
   const taxOpts=[{id:"inclusive",label:"税込（内税）"},{id:"exclusive",label:"税別（外税）"}];
   return <div>
@@ -686,7 +671,7 @@ function InvoicePage({sender,onOpenSenderSettings}){
       <div style={{fontSize:11,color:C.textMuted,marginBottom:12}}>
         📎 ファイル名: <span style={{color:C.text,fontWeight:500}}>{form.recipientName||'請求先'}様_{form.invoiceNumber}.pdf</span>
       </div>
-      <Btn onClick={generate} style={{width:'100%'}}>📄 PDFをダウンロード</Btn>
+      <Btn onClick={generate} disabled={gen} style={{width:'100%'}}>{gen?'⏳ PDF生成中...':'📄 PDFをダウンロード'}</Btn>
     </div>
   </div>;
 }
