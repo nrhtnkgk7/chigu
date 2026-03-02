@@ -547,7 +547,7 @@ function generateInvoicePdf(form,sender,subtotal,tax,taxType){
 @page{size:A4;margin:0;}
 *{margin:0;padding:0;box-sizing:border-box;}
 html,body{width:210mm;height:296mm;overflow:hidden;}
-body{padding:10mm 17mm 8mm;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+body{font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
 a{color:#1a1a1a !important;text-decoration:none !important;pointer-events:none;}
 table{border-collapse:collapse;width:100%;}
 .items-tbl td,.items-tbl th{border:1px solid #555;padding:2mm 3mm;font-size:9pt;height:6mm;}
@@ -563,6 +563,8 @@ table{border-collapse:collapse;width:100%;}
   .summary-tbl td{border:1px solid #555 !important;}
 }
 </style></head><body>
+<div style="text-align:center;padding:20mm;font-family:sans-serif;color:#888;font-size:14pt;" id="loading">PDF生成中...</div>
+<div id="invoice" style="width:210mm;height:296mm;padding:10mm 17mm 8mm;background:#fff;box-sizing:border-box;">
 <div style="text-align:right;font-size:9pt;font-weight:bold;">${fmtJpDate(form.date)}</div>
 <div style="text-align:right;font-size:9pt;font-weight:bold;margin-top:2mm;">請求番号 : <span>${form.invoiceNumber}</span></div>
 <div style="text-align:center;font-size:20pt;font-weight:900;margin:5mm 0 5mm;">請求書</div>
@@ -600,10 +602,20 @@ table{border-collapse:collapse;width:100%;}
   <div style="font-weight:bold;margin-bottom:1.5mm;">お振込先：</div>
   <div>${sender.bank}</div>
 </div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"><\/script>
 <script>
 window.onload=function(){
   document.title="${fn}";
-  setTimeout(function(){window.print()},400);
+  var el=document.getElementById('invoice');
+  html2pdf().from(el).set({
+    margin:0,
+    filename:"${fn}.pdf",
+    html2canvas:{scale:2,useCORS:true,letterRendering:true},
+    jsPDF:{unit:'mm',format:'a4',orientation:'portrait'}
+  }).save().then(function(){
+    setTimeout(function(){window.close()},1000);
+  });
 };
 <\/script>
 </body></html>`;
