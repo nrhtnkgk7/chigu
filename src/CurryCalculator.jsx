@@ -3,23 +3,32 @@ import { useState, useEffect } from "react";
 /* ── Supabase ── */
 const SB_URL = "https://thukhxeznpnwfqtoehyvc.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRodWt4ZXpucG53ZnF0b2VoeXZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4Mzk1NTMsImV4cCI6MjA4ODQxNTU1M30._ZqXyb1slx-8WNmebptkeTNJdv-aUlJGRAwJZdsFkqo";
-const sbHeaders = { "Content-Type": "application/json", "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}`, "Prefer": "resolution=merge-duplicates" };
+const sbBase = { "Content-Type": "application/json", "apikey": SB_KEY, "Authorization": `Bearer ${SB_KEY}` };
 
 async function sbLoad() {
   try {
-    const r = await fetch(`${SB_URL}/rest/v1/curry?id=eq.main`, { headers: sbHeaders });
+    const r = await fetch(`${SB_URL}/rest/v1/curry?id=eq.main`, { headers: sbBase });
+    if (!r.ok) return null;
     const d = await r.json();
     return d && d[0] ? d[0].data : null;
   } catch (e) { return null; }
 }
 
 async function sbSave(data) {
+  // DELETE → INSERT でupsert（最も確実）
+  await fetch(`${SB_URL}/rest/v1/curry?id=eq.main`, {
+    method: "DELETE",
+    headers: sbBase,
+  });
   const r = await fetch(`${SB_URL}/rest/v1/curry`, {
     method: "POST",
-    headers: sbHeaders,
+    headers: { ...sbBase, "Prefer": "return=minimal" },
     body: JSON.stringify({ id: "main", data }),
   });
-  if (!r.ok) throw new Error("保存に失敗しました");
+  if (!r.ok) {
+    const msg = await r.text().catch(() => "不明なエラー");
+    throw new Error(msg);
+  }
 }
 
 const defaultIngredient = () => ({
@@ -291,9 +300,9 @@ const styles = `
     cursor: pointer;
   }
 
-  .c-ing-row3 { display: flex; align-items: center; gap: 10px; }
+  .c-ing-row3 { display: flex; flex-direction: column; gap: 8px; }
   .c-ing-note {
-    flex: 1;
+    width: 100%;
     padding: 7px 10px;
     background: #faf7f2;
     border: 1px solid rgba(180,120,40,0.15);
@@ -309,9 +318,8 @@ const styles = `
     font-size: 15px;
     font-weight: 700;
     color: #9a6010;
-    white-space: nowrap;
-    min-width: 72px;
     text-align: right;
+    padding-right: 2px;
   }
 
   .c-btn-del {
@@ -558,7 +566,7 @@ export default function CurryCalculator() {
                     <div className="c-ing-row3">
                       <input className="c-ing-note" placeholder="備考（産地・ブランドなど）"
                         value={ing.note} onChange={e => updateIngredient(ing.id, "note", e.target.value)} />
-                      <div className="c-ing-subtotal">¥{getSubtotal(ing).toLocaleString()}</div>
+                      <div className="c-ing-subtotal">小計：¥{getSubtotal(ing).toLocaleString()}</div>
                     </div>
                   </div>
                 ))}
