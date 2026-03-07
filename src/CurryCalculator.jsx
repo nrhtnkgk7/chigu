@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect } from "react";
 
 const STORAGE_KEY = "chigu_curry_data";
 
@@ -8,593 +8,688 @@ const defaultIngredient = () => ({
   capacity: "",
   unit: "g",
   price: "",
-  quantity: 1,
+  quantity: "1",
   note: "",
 });
 
-const defaultData = {
-  recipeName: "",
-  servings: 10,
-  ingredients: [defaultIngredient()],
-  recipe: "",
-  memo: "",
-};
+const UNITS = ["g", "kg", "ml", "L", "個", "枚", "本", "袋", "缶", "パック"];
+
+const styles = `
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #0f0d0a;
+    color: #e8dcc8;
+    font-family: 'Noto Sans JP', sans-serif;
+    min-height: 100vh;
+  }
+
+  .curry-app {
+    min-height: 100vh;
+    background: #0f0d0a;
+    background-image:
+      radial-gradient(ellipse at 20% 50%, rgba(180,90,20,0.12) 0%, transparent 60%),
+      radial-gradient(ellipse at 80% 20%, rgba(120,60,10,0.08) 0%, transparent 50%);
+  }
+
+  .header {
+    border-bottom: 1px solid rgba(180,120,40,0.25);
+    padding: 0 32px;
+    background: rgba(15,13,10,0.95);
+    backdrop-filter: blur(12px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: 24px;
+  }
+
+  .back-link {
+    color: rgba(200,160,80,0.7);
+    font-size: 12px;
+    text-decoration: none;
+    letter-spacing: 0.08em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.2s;
+    font-weight: 500;
+  }
+  .back-link:hover { color: #d4a554; }
+
+  .logo {
+    font-family: 'Playfair Display', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #e8c880;
+    letter-spacing: 0.05em;
+  }
+
+  .logo-sub {
+    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 10px;
+    color: rgba(200,160,80,0.55);
+    letter-spacing: 0.18em;
+    font-weight: 300;
+    text-transform: uppercase;
+    margin-top: 1px;
+  }
+
+  .save-badge {
+    font-size: 11px;
+    color: rgba(200,160,80,0.5);
+    letter-spacing: 0.05em;
+  }
+
+  .main {
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 40px 24px 80px;
+  }
+
+  .page-title {
+    margin-bottom: 36px;
+  }
+
+  .page-title h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 30px;
+    font-weight: 400;
+    color: #f0dba0;
+    letter-spacing: 0.04em;
+    line-height: 1.2;
+  }
+
+  .page-title .subtitle {
+    font-size: 12px;
+    color: rgba(180,140,60,0.6);
+    letter-spacing: 0.14em;
+    margin-top: 6px;
+    font-weight: 300;
+  }
+
+  .section {
+    margin-bottom: 28px;
+  }
+
+  .section-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: rgba(200,160,80,0.55);
+    font-weight: 500;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .section-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: rgba(180,120,40,0.2);
+  }
+
+  .card {
+    background: rgba(28,22,14,0.9);
+    border: 1px solid rgba(180,120,40,0.18);
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  /* Summary Cards */
+  .summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 28px;
+  }
+
+  @media (max-width: 600px) {
+    .summary-grid { grid-template-columns: 1fr; }
+  }
+
+  .summary-card {
+    background: rgba(28,22,14,0.9);
+    border: 1px solid rgba(180,120,40,0.2);
+    border-radius: 12px;
+    padding: 20px 22px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .summary-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #b87820, #d4a030, #b87820);
+    opacity: 0.7;
+  }
+
+  .summary-card .s-label {
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    color: rgba(180,140,60,0.6);
+    font-weight: 500;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+  }
+
+  .summary-card .s-value {
+    font-size: 26px;
+    font-weight: 700;
+    color: #f0dba0;
+    letter-spacing: -0.01em;
+    line-height: 1;
+  }
+
+  .summary-card .s-unit {
+    font-size: 13px;
+    color: rgba(200,160,80,0.5);
+    margin-left: 4px;
+    font-weight: 400;
+  }
+
+  .summary-card .s-sub {
+    font-size: 11px;
+    color: rgba(180,140,60,0.5);
+    margin-top: 6px;
+  }
+
+  /* Servings input */
+  .servings-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px 20px;
+    background: rgba(28,22,14,0.9);
+    border: 1px solid rgba(180,120,40,0.18);
+    border-radius: 12px;
+    margin-bottom: 28px;
+  }
+
+  .servings-label {
+    font-size: 12px;
+    color: rgba(200,160,80,0.7);
+    letter-spacing: 0.1em;
+    font-weight: 500;
+    flex: 1;
+  }
+
+  .servings-stepper {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    border: 1px solid rgba(180,120,40,0.3);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .step-btn {
+    width: 36px;
+    height: 36px;
+    background: rgba(180,120,40,0.12);
+    border: none;
+    color: #d4a030;
+    font-size: 18px;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 300;
+  }
+  .step-btn:hover { background: rgba(180,120,40,0.25); }
+
+  .step-display {
+    width: 54px;
+    text-align: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: #f0dba0;
+    background: rgba(28,22,14,0.6);
+    border: none;
+    border-left: 1px solid rgba(180,120,40,0.2);
+    border-right: 1px solid rgba(180,120,40,0.2);
+    padding: 8px 0;
+    outline: none;
+  }
+
+  /* Table */
+  .table-wrapper {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead th {
+    text-align: left;
+    padding: 12px 14px;
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: rgba(180,140,60,0.55);
+    font-weight: 500;
+    text-transform: uppercase;
+    border-bottom: 1px solid rgba(180,120,40,0.2);
+    white-space: nowrap;
+  }
+
+  tbody tr {
+    border-bottom: 1px solid rgba(180,120,40,0.1);
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover {
+    background: rgba(180,120,40,0.05);
+  }
+
+  tbody td {
+    padding: 10px 14px;
+    vertical-align: middle;
+  }
+
+  .subtotal {
+    color: #d4a030;
+    font-weight: 600;
+    font-size: 14px;
+    text-align: right;
+  }
+
+  tfoot td {
+    padding: 14px 14px;
+    font-size: 11px;
+    color: rgba(180,140,60,0.55);
+  }
+
+  tfoot .total-label {
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    color: rgba(200,160,80,0.7);
+    font-weight: 500;
+    text-align: right;
+    padding-right: 8px;
+  }
+
+  tfoot .total-value {
+    font-size: 20px;
+    font-weight: 700;
+    color: #f0dba0;
+    text-align: right;
+    padding-right: 14px;
+  }
+
+  /* Inputs inside table */
+  .t-input {
+    width: 100%;
+    background: rgba(180,120,40,0.06);
+    border: 1px solid rgba(180,120,40,0.15);
+    border-radius: 6px;
+    color: #e8dcc8;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: 'Noto Sans JP', sans-serif;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
+    min-width: 0;
+  }
+  .t-input:focus {
+    border-color: rgba(180,120,40,0.5);
+    background: rgba(180,120,40,0.1);
+  }
+  .t-input.num {
+    text-align: right;
+  }
+  .t-select {
+    background: rgba(180,120,40,0.06);
+    border: 1px solid rgba(180,120,40,0.15);
+    border-radius: 6px;
+    color: #e8dcc8;
+    padding: 6px 8px;
+    font-size: 13px;
+    font-family: 'Noto Sans JP', sans-serif;
+    outline: none;
+    appearance: none;
+    cursor: pointer;
+    width: 70px;
+  }
+
+  /* Buttons */
+  .btn-add {
+    width: 100%;
+    padding: 14px;
+    background: transparent;
+    border: 1px dashed rgba(180,120,40,0.3);
+    border-radius: 0 0 12px 12px;
+    color: rgba(200,160,80,0.6);
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 500;
+  }
+  .btn-add:hover {
+    background: rgba(180,120,40,0.08);
+    color: #d4a030;
+    border-color: rgba(180,120,40,0.5);
+  }
+
+  .btn-del {
+    width: 26px;
+    height: 26px;
+    background: none;
+    border: 1px solid rgba(180,60,40,0.25);
+    border-radius: 6px;
+    color: rgba(200,80,60,0.5);
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+  }
+  .btn-del:hover {
+    background: rgba(180,60,40,0.15);
+    color: #e05030;
+    border-color: rgba(180,60,40,0.4);
+  }
+
+  /* Recipe textarea */
+  .recipe-textarea {
+    width: 100%;
+    min-height: 200px;
+    background: rgba(28,22,14,0.9);
+    border: 1px solid rgba(180,120,40,0.18);
+    border-radius: 12px;
+    color: #e8dcc8;
+    padding: 20px;
+    font-size: 14px;
+    font-family: 'Noto Sans JP', sans-serif;
+    font-weight: 300;
+    line-height: 1.8;
+    outline: none;
+    resize: vertical;
+    transition: border-color 0.2s;
+  }
+  .recipe-textarea:focus {
+    border-color: rgba(180,120,40,0.4);
+  }
+  .recipe-textarea::placeholder {
+    color: rgba(180,140,60,0.25);
+  }
+
+  .divider {
+    height: 1px;
+    background: rgba(180,120,40,0.15);
+    margin: 28px 0;
+  }
+`;
 
 export default function CurryCalculator() {
-  const [data, setData] = useState(() => {
+  const [ingredients, setIngredients] = useState([defaultIngredient()]);
+  const [servings, setServings] = useState(4);
+  const [recipe, setRecipe] = useState("");
+  const [savedAt, setSavedAt] = useState(null);
+
+  useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        const parsed = JSON.parse(saved);
-        return { ...defaultData, ...parsed };
+        const d = JSON.parse(saved);
+        if (d.ingredients) setIngredients(d.ingredients);
+        if (d.servings) setServings(d.servings);
+        if (d.recipe !== undefined) setRecipe(d.recipe);
       }
     } catch {}
-    return { ...defaultData };
-  });
+  }, []);
 
-  const [saved, setSaved] = useState(false);
-
-  // 自動保存
   useEffect(() => {
     const timer = setTimeout(() => {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    }, 500);
+      try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ingredients, servings, recipe }));
+        setSavedAt(new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }));
+      } catch {}
+    }, 600);
     return () => clearTimeout(timer);
-  }, [data]);
+  }, [ingredients, servings, recipe]);
 
-  const updateField = useCallback((field, value) => {
-    setData((prev) => ({ ...prev, [field]: value }));
-    setSaved(false);
-  }, []);
-
-  const updateIngredient = useCallback((id, field, value) => {
-    setData((prev) => ({
-      ...prev,
-      ingredients: prev.ingredients.map((ing) =>
-        ing.id === id ? { ...ing, [field]: value } : ing
-      ),
-    }));
-    setSaved(false);
-  }, []);
+  const updateIngredient = (id, field, value) => {
+    setIngredients(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
+  };
 
   const addIngredient = () => {
-    setData((prev) => ({
-      ...prev,
-      ingredients: [...prev.ingredients, defaultIngredient()],
-    }));
+    setIngredients(prev => [...prev, defaultIngredient()]);
   };
 
   const removeIngredient = (id) => {
-    setData((prev) => ({
-      ...prev,
-      ingredients: prev.ingredients.filter((ing) => ing.id !== id),
-    }));
+    setIngredients(prev => prev.filter(i => i.id !== id));
   };
 
-  const calcSubtotal = (ing) => {
-    const price = parseFloat(ing.price) || 0;
-    const qty = parseFloat(ing.quantity) || 0;
-    return price * qty;
+  const getSubtotal = (ing) => {
+    const p = parseFloat(ing.price) || 0;
+    const q = parseFloat(ing.quantity) || 0;
+    return p * q;
   };
 
-  const totalCost = data.ingredients.reduce(
-    (sum, ing) => sum + calcSubtotal(ing),
-    0
-  );
+  const totalCost = ingredients.reduce((s, i) => s + getSubtotal(i), 0);
+  const costPerPerson = servings > 0 ? Math.ceil(totalCost / servings) : 0;
 
-  const totalCapacity = data.ingredients.reduce((sum, ing) => {
-    const cap = parseFloat(ing.capacity) || 0;
-    const qty = parseFloat(ing.quantity) || 0;
-    return sum + cap * qty;
-  }, 0);
-
-  const servings = Math.max(1, parseInt(data.servings) || 1);
-  const costPerPerson = totalCost / servings;
-  const capacityPerPerson = totalCapacity / servings;
-
-  const handleSave = () => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
-  };
-
-  const handleExportCSV = () => {
-    const header = "材料名,容量,単位,値段,個数,合計,備考";
-    const rows = data.ingredients.map(
-      (ing) =>
-        `"${ing.name}","${ing.capacity}","${ing.unit}","${ing.price}","${ing.quantity}","${calcSubtotal(ing)}","${ing.note}"`
-    );
-    const footer = `\n人数,${servings}\n合計原価,¥${totalCost.toLocaleString()}\n1人あたり原価,¥${Math.ceil(costPerPerson).toLocaleString()}\n1人あたり量,${Math.round(capacityPerPerson)}g`;
-    const csv = [header, ...rows].join("\n") + footer;
-    const blob = new Blob(["\uFEFF" + csv], {
-      type: "text/csv;charset=utf-8;",
+  const totalCapacity = () => {
+    const byUnit = {};
+    ingredients.forEach(i => {
+      if (!i.name || !i.capacity) return;
+      const u = i.unit || "g";
+      const cap = (parseFloat(i.capacity) || 0) * (parseFloat(i.quantity) || 0);
+      if (cap > 0) byUnit[u] = (byUnit[u] || 0) + cap;
     });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${data.recipeName || "curry"}_recipe.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    return byUnit;
   };
 
-  const handleReset = () => {
-    if (window.confirm("すべてのデータをリセットしますか？")) {
-      setData({ ...defaultData, ingredients: [defaultIngredient()] });
-      localStorage.removeItem(STORAGE_KEY);
-    }
+  const capacityPerPerson = () => {
+    const total = totalCapacity();
+    if (servings <= 0) return {};
+    const result = {};
+    Object.entries(total).forEach(([u, v]) => { result[u] = (v / servings).toFixed(1); });
+    return result;
   };
 
-  // --- styles ---
-  const styles = {
-    container: {
-      maxWidth: 960,
-      margin: "0 auto",
-      padding: "24px 16px",
-      fontFamily:
-        '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-      color: "#333",
-      fontSize: 14,
-    },
-    header: {
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "space-between",
-      marginBottom: 24,
-      flexWrap: "wrap",
-      gap: 12,
-    },
-    title: {
-      fontSize: 20,
-      fontWeight: 600,
-      color: "#222",
-      margin: 0,
-    },
-    subtitle: {
-      fontSize: 12,
-      color: "#888",
-      marginTop: 2,
-    },
-    backLink: {
-      fontSize: 13,
-      color: "#666",
-      textDecoration: "none",
-      border: "1px solid #ddd",
-      borderRadius: 4,
-      padding: "6px 12px",
-    },
-    section: {
-      marginBottom: 28,
-    },
-    sectionTitle: {
-      fontSize: 14,
-      fontWeight: 600,
-      color: "#555",
-      marginBottom: 10,
-      borderBottom: "1px solid #eee",
-      paddingBottom: 6,
-    },
-    input: {
-      border: "1px solid #ddd",
-      borderRadius: 4,
-      padding: "6px 8px",
-      fontSize: 13,
-      width: "100%",
-      boxSizing: "border-box",
-      outline: "none",
-    },
-    inputFocus: {
-      borderColor: "#999",
-    },
-    select: {
-      border: "1px solid #ddd",
-      borderRadius: 4,
-      padding: "6px 4px",
-      fontSize: 13,
-      background: "#fff",
-      outline: "none",
-    },
-    tableWrap: {
-      overflowX: "auto",
-      WebkitOverflowScrolling: "touch",
-    },
-    table: {
-      width: "100%",
-      borderCollapse: "collapse",
-      minWidth: 700,
-    },
-    th: {
-      background: "#f5f5f5",
-      color: "#666",
-      fontWeight: 500,
-      fontSize: 12,
-      padding: "8px 6px",
-      textAlign: "left",
-      borderBottom: "2px solid #e0e0e0",
-      whiteSpace: "nowrap",
-    },
-    td: {
-      padding: "4px 4px",
-      borderBottom: "1px solid #f0f0f0",
-      verticalAlign: "middle",
-    },
-    numTd: {
-      textAlign: "right",
-      fontVariantNumeric: "tabular-nums",
-    },
-    removeBtn: {
-      background: "none",
-      border: "none",
-      color: "#ccc",
-      cursor: "pointer",
-      fontSize: 18,
-      padding: "2px 6px",
-      lineHeight: 1,
-    },
-    addBtn: {
-      background: "#fff",
-      border: "1px dashed #ccc",
-      borderRadius: 4,
-      padding: "8px 16px",
-      color: "#888",
-      cursor: "pointer",
-      fontSize: 13,
-      width: "100%",
-      marginTop: 4,
-    },
-    summaryBox: {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: 12,
-      marginTop: 16,
-    },
-    summaryCard: {
-      flex: "1 1 140px",
-      background: "#fafafa",
-      border: "1px solid #eee",
-      borderRadius: 6,
-      padding: "12px 16px",
-      textAlign: "center",
-    },
-    summaryLabel: {
-      fontSize: 11,
-      color: "#888",
-      marginBottom: 4,
-    },
-    summaryValue: {
-      fontSize: 20,
-      fontWeight: 600,
-      color: "#333",
-    },
-    summaryHighlight: {
-      fontSize: 20,
-      fontWeight: 700,
-      color: "#d35400",
-    },
-    textarea: {
-      border: "1px solid #ddd",
-      borderRadius: 4,
-      padding: "10px 12px",
-      fontSize: 13,
-      width: "100%",
-      boxSizing: "border-box",
-      resize: "vertical",
-      outline: "none",
-      lineHeight: 1.8,
-      fontFamily: "inherit",
-    },
-    row: {
-      display: "flex",
-      gap: 12,
-      alignItems: "center",
-      flexWrap: "wrap",
-      marginBottom: 12,
-    },
-    btnGroup: {
-      display: "flex",
-      gap: 8,
-      flexWrap: "wrap",
-    },
-    btn: {
-      border: "1px solid #ddd",
-      borderRadius: 4,
-      padding: "8px 16px",
-      fontSize: 13,
-      cursor: "pointer",
-      background: "#fff",
-      color: "#555",
-    },
-    btnPrimary: {
-      border: "1px solid #333",
-      borderRadius: 4,
-      padding: "8px 16px",
-      fontSize: 13,
-      cursor: "pointer",
-      background: "#333",
-      color: "#fff",
-    },
-    savedMsg: {
-      fontSize: 12,
-      color: "#27ae60",
-      marginLeft: 8,
-    },
-    servingsInput: {
-      width: 70,
-      textAlign: "center",
-      border: "1px solid #ddd",
-      borderRadius: 4,
-      padding: "6px 8px",
-      fontSize: 15,
-      fontWeight: 600,
-      outline: "none",
-    },
-    servingsLabel: {
-      fontSize: 13,
-      color: "#666",
-    },
+  const capPerPersonStr = () => {
+    const cap = capacityPerPerson();
+    const parts = Object.entries(cap).map(([u, v]) => `${v}${u}`);
+    return parts.length > 0 ? parts.join(" + ") : "—";
   };
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <div>
-          <h1 style={styles.title}>レシピ原価計算</h1>
-          <div style={styles.subtitle}>chigu - Recipe Cost Calculator</div>
-        </div>
-        <a href="/" style={styles.backLink}>
-          ← 案件管理へ戻る
-        </a>
-      </div>
-
-      {/* レシピ名 & 人数 */}
-      <div style={styles.section}>
-        <div style={styles.row}>
-          <div style={{ flex: "1 1 200px" }}>
-            <input
-              style={styles.input}
-              placeholder="レシピ名（例：チキンカレー）"
-              value={data.recipeName}
-              onChange={(e) => updateField("recipeName", e.target.value)}
-            />
-          </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 6,
-            }}
-          >
-            <span style={styles.servingsLabel}>人数</span>
-            <input
-              type="number"
-              min="1"
-              style={styles.servingsInput}
-              value={data.servings}
-              onChange={(e) => updateField("servings", e.target.value)}
-            />
-            <span style={styles.servingsLabel}>人分</span>
-          </div>
-        </div>
-      </div>
-
-      {/* 購入材料テーブル */}
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>購入材料</div>
-        <div style={styles.tableWrap}>
-          <table style={styles.table}>
-            <thead>
-              <tr>
-                <th style={{ ...styles.th, width: 30 }}></th>
-                <th style={{ ...styles.th, minWidth: 120 }}>材料名</th>
-                <th style={{ ...styles.th, width: 80 }}>容量</th>
-                <th style={{ ...styles.th, width: 60 }}>単位</th>
-                <th style={{ ...styles.th, width: 90 }}>値段（税込）</th>
-                <th style={{ ...styles.th, width: 60 }}>個数</th>
-                <th style={{ ...styles.th, width: 90 }}>合計</th>
-                <th style={{ ...styles.th, minWidth: 100 }}>備考</th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.ingredients.map((ing, idx) => (
-                <tr key={ing.id}>
-                  <td style={styles.td}>
-                    {data.ingredients.length > 1 && (
-                      <button
-                        style={styles.removeBtn}
-                        onClick={() => removeIngredient(ing.id)}
-                        title="削除"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </td>
-                  <td style={styles.td}>
-                    <input
-                      style={styles.input}
-                      placeholder={`材料${idx + 1}`}
-                      value={ing.name}
-                      onChange={(e) =>
-                        updateIngredient(ing.id, "name", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td style={styles.td}>
-                    <input
-                      type="number"
-                      style={{ ...styles.input, textAlign: "right" }}
-                      placeholder="0"
-                      value={ing.capacity}
-                      onChange={(e) =>
-                        updateIngredient(ing.id, "capacity", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td style={styles.td}>
-                    <select
-                      style={styles.select}
-                      value={ing.unit}
-                      onChange={(e) =>
-                        updateIngredient(ing.id, "unit", e.target.value)
-                      }
-                    >
-                      <option value="g">g</option>
-                      <option value="kg">kg</option>
-                      <option value="ml">ml</option>
-                      <option value="L">L</option>
-                      <option value="個">個</option>
-                      <option value="本">本</option>
-                      <option value="枚">枚</option>
-                      <option value="缶">缶</option>
-                      <option value="袋">袋</option>
-                      <option value="パック">パック</option>
-                      <option value="束">束</option>
-                      <option value="房">房</option>
-                      <option value="片">片</option>
-                    </select>
-                  </td>
-                  <td style={styles.td}>
-                    <input
-                      type="number"
-                      style={{ ...styles.input, textAlign: "right" }}
-                      placeholder="¥0"
-                      value={ing.price}
-                      onChange={(e) =>
-                        updateIngredient(ing.id, "price", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td style={styles.td}>
-                    <input
-                      type="number"
-                      min="1"
-                      style={{
-                        ...styles.input,
-                        textAlign: "center",
-                        width: 50,
-                      }}
-                      value={ing.quantity}
-                      onChange={(e) =>
-                        updateIngredient(ing.id, "quantity", e.target.value)
-                      }
-                    />
-                  </td>
-                  <td style={{ ...styles.td, ...styles.numTd }}>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        fontWeight: 500,
-                        padding: "0 8px",
-                      }}
-                    >
-                      ¥{calcSubtotal(ing).toLocaleString()}
-                    </span>
-                  </td>
-                  <td style={styles.td}>
-                    <input
-                      style={styles.input}
-                      placeholder=""
-                      value={ing.note}
-                      onChange={(e) =>
-                        updateIngredient(ing.id, "note", e.target.value)
-                      }
-                    />
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <button style={styles.addBtn} onClick={addIngredient}>
-          ＋ 材料を追加
-        </button>
-
-        {/* サマリー */}
-        <div style={styles.summaryBox}>
-          <div style={styles.summaryCard}>
-            <div style={styles.summaryLabel}>材料合計</div>
-            <div style={styles.summaryValue}>
-              ¥{totalCost.toLocaleString()}
+    <>
+      <style dangerouslySetInnerHTML={{ __html: styles }} />
+      <div className="curry-app">
+        <header className="header">
+          <div className="header-left">
+            <a href="/" className="back-link">← 案件管理</a>
+            <div>
+              <div className="logo">chigu</div>
+              <div className="logo-sub">Recipe Studio</div>
             </div>
           </div>
-          <div style={styles.summaryCard}>
-            <div style={styles.summaryLabel}>総容量</div>
-            <div style={styles.summaryValue}>
-              {totalCapacity.toLocaleString()}g
+          <div className="save-badge">
+            {savedAt ? `${savedAt} 保存済` : ""}
+          </div>
+        </header>
+
+        <main className="main">
+          <div className="page-title">
+            <h1>Curry Recipe</h1>
+            <div className="subtitle">COST CALCULATOR & RECIPE NOTES</div>
+          </div>
+
+          {/* Summary */}
+          <div className="summary-grid">
+            <div className="summary-card">
+              <div className="s-label">Total Cost</div>
+              <div className="s-value">
+                ¥{totalCost.toLocaleString()}
+              </div>
+              <div className="s-sub">材料費合計</div>
+            </div>
+            <div className="summary-card">
+              <div className="s-label">Cost / Person</div>
+              <div className="s-value">
+                ¥{costPerPerson.toLocaleString()}
+              </div>
+              <div className="s-sub">1人あたり原価</div>
+            </div>
+            <div className="summary-card">
+              <div className="s-label">Amount / Person</div>
+              <div className="s-value" style={{ fontSize: capPerPersonStr().length > 8 ? 18 : 22 }}>
+                {capPerPersonStr()}
+              </div>
+              <div className="s-sub">1人あたりの量</div>
             </div>
           </div>
-          <div style={styles.summaryCard}>
-            <div style={styles.summaryLabel}>
-              1人あたり原価（{servings}人分）
+
+          {/* Servings */}
+          <div className="section-label">人数設定</div>
+          <div className="servings-row">
+            <span className="servings-label">作る人数</span>
+            <div className="servings-stepper">
+              <button className="step-btn" onClick={() => setServings(s => Math.max(1, s - 1))}>−</button>
+              <input
+                className="step-display"
+                type="number"
+                min="1"
+                value={servings}
+                onChange={e => setServings(Math.max(1, parseInt(e.target.value) || 1))}
+              />
+              <button className="step-btn" onClick={() => setServings(s => s + 1)}>＋</button>
             </div>
-            <div style={styles.summaryHighlight}>
-              ¥{Math.ceil(costPerPerson).toLocaleString()}
-            </div>
+            <span style={{ fontSize: 13, color: "rgba(180,140,60,0.55)", marginLeft: 8 }}>人分</span>
           </div>
-          <div style={styles.summaryCard}>
-            <div style={styles.summaryLabel}>
-              1人あたり量（{servings}人分）
+
+          {/* Ingredients */}
+          <div className="section-label" style={{ marginTop: 28 }}>購入材料</div>
+          <div className="card">
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th style={{ width: "18%" }}>材料名</th>
+                    <th style={{ width: "10%" }}>容量</th>
+                    <th style={{ width: "8%" }}>単位</th>
+                    <th style={{ width: "12%", textAlign: "right" }}>値段</th>
+                    <th style={{ width: "8%", textAlign: "right" }}>個数</th>
+                    <th style={{ width: "12%", textAlign: "right" }}>合計</th>
+                    <th>備考</th>
+                    <th style={{ width: "36px" }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ingredients.map((ing) => (
+                    <tr key={ing.id}>
+                      <td>
+                        <input
+                          className="t-input"
+                          placeholder="例：玉ねぎ"
+                          value={ing.name}
+                          onChange={e => updateIngredient(ing.id, "name", e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="t-input num"
+                          placeholder="200"
+                          value={ing.capacity}
+                          onChange={e => updateIngredient(ing.id, "capacity", e.target.value)}
+                          type="number"
+                          min="0"
+                        />
+                      </td>
+                      <td>
+                        <select
+                          className="t-select"
+                          value={ing.unit}
+                          onChange={e => updateIngredient(ing.id, "unit", e.target.value)}
+                        >
+                          {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          className="t-input num"
+                          placeholder="¥0"
+                          value={ing.price}
+                          onChange={e => updateIngredient(ing.id, "price", e.target.value)}
+                          type="number"
+                          min="0"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="t-input num"
+                          placeholder="1"
+                          value={ing.quantity}
+                          onChange={e => updateIngredient(ing.id, "quantity", e.target.value)}
+                          type="number"
+                          min="1"
+                        />
+                      </td>
+                      <td className="subtotal">
+                        ¥{getSubtotal(ing).toLocaleString()}
+                      </td>
+                      <td>
+                        <input
+                          className="t-input"
+                          placeholder="メモ"
+                          value={ing.note}
+                          onChange={e => updateIngredient(ing.id, "note", e.target.value)}
+                        />
+                      </td>
+                      <td>
+                        <button className="btn-del" onClick={() => removeIngredient(ing.id)}>×</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr>
+                    <td colSpan={5} className="total-label">TOTAL</td>
+                    <td className="total-value">¥{totalCost.toLocaleString()}</td>
+                    <td colSpan={2}></td>
+                  </tr>
+                </tfoot>
+              </table>
             </div>
-            <div style={styles.summaryValue}>
-              {Math.round(capacityPerPerson).toLocaleString()}g
-            </div>
+            <button className="btn-add" onClick={addIngredient}>＋ 材料を追加</button>
           </div>
-        </div>
-      </div>
 
-      {/* レシピ */}
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>レシピ・作り方</div>
-        <textarea
-          style={{ ...styles.textarea, minHeight: 180 }}
-          placeholder={
-            "1. 玉ねぎをみじん切りにし、飴色になるまで炒める\n2. 鶏肉を一口大に切り、塩こしょうで下味をつける\n3. ..."
-          }
-          value={data.recipe}
-          onChange={(e) => updateField("recipe", e.target.value)}
-        />
-      </div>
+          <div className="divider" />
 
-      {/* メモ */}
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>開発メモ</div>
-        <textarea
-          style={{ ...styles.textarea, minHeight: 80 }}
-          placeholder="改善点、次回試したいこと、味の感想など..."
-          value={data.memo}
-          onChange={(e) => updateField("memo", e.target.value)}
-        />
+          {/* Recipe Notes */}
+          <div className="section-label">レシピ手順</div>
+          <textarea
+            className="recipe-textarea"
+            placeholder="レシピの手順、コツ、メモなどを自由に記入..."
+            value={recipe}
+            onChange={e => setRecipe(e.target.value)}
+          />
+        </main>
       </div>
-
-      {/* ボタン */}
-      <div style={{ ...styles.btnGroup, justifyContent: "space-between" }}>
-        <div style={styles.btnGroup}>
-          <button style={styles.btnPrimary} onClick={handleSave}>
-            保存
-          </button>
-          {saved && <span style={styles.savedMsg}>✓ 保存しました</span>}
-          <button style={styles.btn} onClick={handleExportCSV}>
-            CSV出力
-          </button>
-        </div>
-        <button
-          style={{ ...styles.btn, color: "#c0392b", borderColor: "#e0c0b0" }}
-          onClick={handleReset}
-        >
-          リセット
-        </button>
-      </div>
-
-      <div
-        style={{
-          textAlign: "center",
-          fontSize: 11,
-          color: "#bbb",
-          marginTop: 40,
-          paddingBottom: 20,
-        }}
-      >
-        chigu — Recipe Cost Calculator
-      </div>
-    </div>
+    </>
   );
 }
