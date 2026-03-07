@@ -20,24 +20,24 @@ const styles = `
   * { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    background: #0f0d0a;
-    color: #e8dcc8;
+    background: #faf7f2;
+    color: #3a2e1e;
     font-family: 'Noto Sans JP', sans-serif;
     min-height: 100vh;
   }
 
   .curry-app {
     min-height: 100vh;
-    background: #0f0d0a;
+    background: #faf7f2;
     background-image:
-      radial-gradient(ellipse at 20% 50%, rgba(180,90,20,0.12) 0%, transparent 60%),
-      radial-gradient(ellipse at 80% 20%, rgba(120,60,10,0.08) 0%, transparent 50%);
+      radial-gradient(ellipse at 15% 40%, rgba(210,140,50,0.08) 0%, transparent 55%),
+      radial-gradient(ellipse at 85% 15%, rgba(190,120,30,0.06) 0%, transparent 50%);
   }
 
   .header {
-    border-bottom: 1px solid rgba(180,120,40,0.25);
+    border-bottom: 1px solid rgba(180,120,40,0.2);
     padding: 0 32px;
-    background: rgba(15,13,10,0.95);
+    background: rgba(250,247,242,0.97);
     backdrop-filter: blur(12px);
     position: sticky;
     top: 0;
@@ -55,7 +55,7 @@ const styles = `
   }
 
   .back-link {
-    color: rgba(200,160,80,0.7);
+    color: rgba(160,110,40,0.75);
     font-size: 12px;
     text-decoration: none;
     letter-spacing: 0.08em;
@@ -65,20 +65,20 @@ const styles = `
     transition: color 0.2s;
     font-weight: 500;
   }
-  .back-link:hover { color: #d4a554; }
+  .back-link:hover { color: #a06820; }
 
   .logo {
     font-family: 'Playfair Display', serif;
     font-size: 22px;
     font-weight: 700;
-    color: #e8c880;
+    color: #7a4e10;
     letter-spacing: 0.05em;
   }
 
   .logo-sub {
     font-family: 'Noto Sans JP', sans-serif;
     font-size: 10px;
-    color: rgba(200,160,80,0.55);
+    color: rgba(140,90,30,0.55);
     letter-spacing: 0.18em;
     font-weight: 300;
     text-transform: uppercase;
@@ -87,7 +87,7 @@ const styles = `
 
   .save-badge {
     font-size: 11px;
-    color: rgba(200,160,80,0.5);
+    color: rgba(140,100,40,0.55);
     letter-spacing: 0.05em;
   }
 
@@ -105,14 +105,14 @@ const styles = `
     font-family: 'Playfair Display', serif;
     font-size: 30px;
     font-weight: 400;
-    color: #f0dba0;
+    color: #4a3010;
     letter-spacing: 0.04em;
     line-height: 1.2;
   }
 
   .page-title .subtitle {
     font-size: 12px;
-    color: rgba(180,140,60,0.6);
+    color: rgba(140,100,40,0.65);
     letter-spacing: 0.14em;
     margin-top: 6px;
     font-weight: 300;
@@ -125,8 +125,8 @@ const styles = `
   .section-label {
     font-size: 10px;
     letter-spacing: 0.2em;
-    color: rgba(200,160,80,0.55);
-    font-weight: 500;
+    color: rgba(140,100,40,0.65);
+    font-weight: 600;
     text-transform: uppercase;
     margin-bottom: 12px;
     display: flex;
@@ -142,10 +142,11 @@ const styles = `
   }
 
   .card {
-    background: rgba(28,22,14,0.9);
+    background: #ffffff;
     border: 1px solid rgba(180,120,40,0.18);
     border-radius: 12px;
     overflow: hidden;
+    box-shadow: 0 1px 8px rgba(120,70,10,0.06);
   }
 
   /* Summary Cards */
@@ -161,28 +162,29 @@ const styles = `
   }
 
   .summary-card {
-    background: rgba(28,22,14,0.9);
+    background: #ffffff;
     border: 1px solid rgba(180,120,40,0.2);
     border-radius: 12px;
     padding: 20px 22px;
     position: relative;
     overflow: hidden;
+    box-shadow: 0 1px 8px rgba(120,70,10,0.06);
   }
 
   .summary-card::before {
     content: '';
     position: absolute;
     top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, #b87820, #d4a030, #b87820);
-    opacity: 0.7;
+    height: 3px;
+    background: linear-gradient(90deg, #c8882a, #e8a838, #c8882a);
+    opacity: 0.85;
   }
 
   .summary-card .s-label {
     font-size: 10px;
     letter-spacing: 0.18em;
-    color: rgba(180,140,60,0.6);
-    font-weight: 500;
+    color: rgba(140,100,40,0.65);
+    font-weight: 600;
     margin-bottom: 10px;
     text-transform: uppercase;
   }
@@ -190,21 +192,21 @@ const styles = `
   .summary-card .s-value {
     font-size: 26px;
     font-weight: 700;
-    color: #f0dba0;
+    color: #3a2010;
     letter-spacing: -0.01em;
     line-height: 1;
   }
 
   .summary-card .s-unit {
     font-size: 13px;
-    color: rgba(200,160,80,0.5);
+    color: rgba(100,70,20,0.5);
     margin-left: 4px;
     font-weight: 400;
   }
 
   .summary-card .s-sub {
     font-size: 11px;
-    color: rgba(180,140,60,0.5);
+    color: rgba(120,80,30,0.55);
     margin-top: 6px;
   }
 
@@ -214,16 +216,17 @@ const styles = `
     align-items: center;
     gap: 14px;
     padding: 18px 20px;
-    background: rgba(28,22,14,0.9);
+    background: #ffffff;
     border: 1px solid rgba(180,120,40,0.18);
     border-radius: 12px;
     margin-bottom: 28px;
+    box-shadow: 0 1px 8px rgba(120,70,10,0.06);
   }
 
   .servings-label {
-    font-size: 12px;
-    color: rgba(200,160,80,0.7);
-    letter-spacing: 0.1em;
+    font-size: 13px;
+    color: #4a3010;
+    letter-spacing: 0.06em;
     font-weight: 500;
     flex: 1;
   }
@@ -232,7 +235,7 @@ const styles = `
     display: flex;
     align-items: center;
     gap: 0;
-    border: 1px solid rgba(180,120,40,0.3);
+    border: 1px solid rgba(180,120,40,0.35);
     border-radius: 8px;
     overflow: hidden;
   }
@@ -240,26 +243,26 @@ const styles = `
   .step-btn {
     width: 36px;
     height: 36px;
-    background: rgba(180,120,40,0.12);
+    background: rgba(200,136,42,0.1);
     border: none;
-    color: #d4a030;
+    color: #a06820;
     font-size: 18px;
     cursor: pointer;
     transition: background 0.15s;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-weight: 300;
+    font-weight: 400;
   }
-  .step-btn:hover { background: rgba(180,120,40,0.25); }
+  .step-btn:hover { background: rgba(200,136,42,0.22); }
 
   .step-display {
     width: 54px;
     text-align: center;
     font-size: 18px;
     font-weight: 700;
-    color: #f0dba0;
-    background: rgba(28,22,14,0.6);
+    color: #3a2010;
+    background: #fffdf8;
     border: none;
     border-left: 1px solid rgba(180,120,40,0.2);
     border-right: 1px solid rgba(180,120,40,0.2);
@@ -283,10 +286,11 @@ const styles = `
     padding: 12px 14px;
     font-size: 10px;
     letter-spacing: 0.16em;
-    color: rgba(180,140,60,0.55);
-    font-weight: 500;
+    color: rgba(120,80,30,0.65);
+    font-weight: 600;
     text-transform: uppercase;
-    border-bottom: 1px solid rgba(180,120,40,0.2);
+    border-bottom: 1px solid rgba(180,120,40,0.18);
+    background: #fdf8f0;
     white-space: nowrap;
   }
 
@@ -296,7 +300,7 @@ const styles = `
   }
 
   tbody tr:hover {
-    background: rgba(180,120,40,0.05);
+    background: #fdf6ea;
   }
 
   tbody td {
@@ -305,7 +309,7 @@ const styles = `
   }
 
   .subtotal {
-    color: #d4a030;
+    color: #9a6010;
     font-weight: 600;
     font-size: 14px;
     text-align: right;
@@ -314,14 +318,15 @@ const styles = `
   tfoot td {
     padding: 14px 14px;
     font-size: 11px;
-    color: rgba(180,140,60,0.55);
+    color: rgba(120,80,30,0.6);
+    background: #fdf8f0;
   }
 
   tfoot .total-label {
     font-size: 12px;
     letter-spacing: 0.1em;
-    color: rgba(200,160,80,0.7);
-    font-weight: 500;
+    color: rgba(120,80,30,0.75);
+    font-weight: 600;
     text-align: right;
     padding-right: 8px;
   }
@@ -329,7 +334,7 @@ const styles = `
   tfoot .total-value {
     font-size: 20px;
     font-weight: 700;
-    color: #f0dba0;
+    color: #3a2010;
     text-align: right;
     padding-right: 14px;
   }
@@ -337,10 +342,10 @@ const styles = `
   /* Inputs inside table */
   .t-input {
     width: 100%;
-    background: rgba(180,120,40,0.06);
-    border: 1px solid rgba(180,120,40,0.15);
+    background: #faf7f2;
+    border: 1px solid rgba(180,120,40,0.2);
     border-radius: 6px;
-    color: #e8dcc8;
+    color: #3a2e1e;
     padding: 6px 8px;
     font-size: 13px;
     font-family: 'Noto Sans JP', sans-serif;
@@ -349,17 +354,17 @@ const styles = `
     min-width: 0;
   }
   .t-input:focus {
-    border-color: rgba(180,120,40,0.5);
-    background: rgba(180,120,40,0.1);
+    border-color: rgba(180,120,40,0.55);
+    background: #fff9ee;
   }
   .t-input.num {
     text-align: right;
   }
   .t-select {
-    background: rgba(180,120,40,0.06);
-    border: 1px solid rgba(180,120,40,0.15);
+    background: #faf7f2;
+    border: 1px solid rgba(180,120,40,0.2);
     border-radius: 6px;
-    color: #e8dcc8;
+    color: #3a2e1e;
     padding: 6px 8px;
     font-size: 13px;
     font-family: 'Noto Sans JP', sans-serif;
@@ -374,9 +379,9 @@ const styles = `
     width: 100%;
     padding: 14px;
     background: transparent;
-    border: 1px dashed rgba(180,120,40,0.3);
-    border-radius: 0 0 12px 12px;
-    color: rgba(200,160,80,0.6);
+    border: none;
+    border-top: 1px dashed rgba(180,120,40,0.25);
+    color: rgba(140,90,30,0.65);
     font-size: 12px;
     letter-spacing: 0.12em;
     cursor: pointer;
@@ -385,18 +390,17 @@ const styles = `
     font-weight: 500;
   }
   .btn-add:hover {
-    background: rgba(180,120,40,0.08);
-    color: #d4a030;
-    border-color: rgba(180,120,40,0.5);
+    background: #fdf6ea;
+    color: #a06820;
   }
 
   .btn-del {
     width: 26px;
     height: 26px;
     background: none;
-    border: 1px solid rgba(180,60,40,0.25);
+    border: 1px solid rgba(200,80,60,0.2);
     border-radius: 6px;
-    color: rgba(200,80,60,0.5);
+    color: rgba(200,80,60,0.45);
     font-size: 14px;
     cursor: pointer;
     display: flex;
@@ -406,33 +410,34 @@ const styles = `
     flex-shrink: 0;
   }
   .btn-del:hover {
-    background: rgba(180,60,40,0.15);
-    color: #e05030;
-    border-color: rgba(180,60,40,0.4);
+    background: rgba(200,80,60,0.1);
+    color: #c04030;
+    border-color: rgba(200,80,60,0.4);
   }
 
   /* Recipe textarea */
   .recipe-textarea {
     width: 100%;
     min-height: 200px;
-    background: rgba(28,22,14,0.9);
+    background: #ffffff;
     border: 1px solid rgba(180,120,40,0.18);
     border-radius: 12px;
-    color: #e8dcc8;
+    color: #3a2e1e;
     padding: 20px;
     font-size: 14px;
     font-family: 'Noto Sans JP', sans-serif;
     font-weight: 300;
-    line-height: 1.8;
+    line-height: 1.9;
     outline: none;
     resize: vertical;
     transition: border-color 0.2s;
+    box-shadow: 0 1px 8px rgba(120,70,10,0.05);
   }
   .recipe-textarea:focus {
-    border-color: rgba(180,120,40,0.4);
+    border-color: rgba(180,120,40,0.45);
   }
   .recipe-textarea::placeholder {
-    color: rgba(180,140,60,0.25);
+    color: rgba(140,100,40,0.3);
   }
 
   .divider {
