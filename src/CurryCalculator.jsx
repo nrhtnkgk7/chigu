@@ -2,6 +2,23 @@ import { useState, useEffect } from "react";
 
 const STORAGE_KEY = "chigu_curry_data";
 
+/* ── Supabase ── */
+const SB_URL = "https://thukhxeznpnwfqtoehyvc.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRodWt4ZXpucG53ZnF0b2VoeXZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4Mzk1NTMsImV4cCI6MjA4ODQxNTU1M30._ZqXyb1slx-8WNmebptkeTNJdv-aUlJGRAwJZdsFkqo";
+const sbHeaders = { "Content-Type":"application/json", "apikey":SB_KEY, "Authorization":`Bearer ${SB_KEY}`, "Prefer":"resolution=merge-duplicates" };
+async function sbGet(data) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/curry?id=eq.main`, { headers: sbHeaders });
+    const d = await r.json();
+    return d && d[0] ? d[0].data : null;
+  } catch(e) { return null; }
+}
+async function sbSet(data) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/curry`, { method:"POST", headers: sbHeaders, body: JSON.stringify({ id:"main", data }) });
+  } catch(e) {}
+}
+
 const defaultIngredient = () => ({
   id: Date.now() + Math.random(),
   name: "",
@@ -454,23 +471,19 @@ export default function CurryCalculator() {
   const [savedAt, setSavedAt] = useState(null);
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        const d = JSON.parse(saved);
+    sbGet().then(d => {
+      if (d) {
         if (d.ingredients) setIngredients(d.ingredients);
         if (d.servings) setServings(d.servings);
         if (d.recipe !== undefined) setRecipe(d.recipe);
       }
-    } catch {}
+    });
   }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      try {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify({ ingredients, servings, recipe }));
-        setSavedAt(new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }));
-      } catch {}
+      sbSet({ ingredients, servings, recipe });
+      setSavedAt(new Date().toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" }));
     }, 600);
     return () => clearTimeout(timer);
   }, [ingredients, servings, recipe]);

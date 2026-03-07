@@ -3,6 +3,23 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import CurryCalculator from "./CurryCalculator";
 
 const STORAGE_KEYS = { cases: "cases-data", settings: "monthly-settings", pin: "app-pin", sender: "sender-info" };
+
+/* ── Supabase ── */
+const SB_URL = "https://thukhxeznpnwfqtoehyvc.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRodWt4ZXpucG53ZnF0b2VoeXZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4Mzk1NTMsImV4cCI6MjA4ODQxNTU1M30._ZqXyb1slx-8WNmebptkeTNJdv-aUlJGRAwJZdsFkqo";
+const sbHeaders = { "Content-Type":"application/json", "apikey":SB_KEY, "Authorization":`Bearer ${SB_KEY}`, "Prefer":"resolution=merge-duplicates" };
+async function sbGet(table, id) {
+  try {
+    const r = await fetch(`${SB_URL}/rest/v1/${table}?id=eq.${id}`, { headers: sbHeaders });
+    const d = await r.json();
+    return d && d[0] ? d[0].data : null;
+  } catch(e) { return null; }
+}
+async function sbSet(table, id, data) {
+  try {
+    await fetch(`${SB_URL}/rest/v1/${table}`, { method:"POST", headers: sbHeaders, body: JSON.stringify({ id, data }) });
+  } catch(e) {}
+}
 const defaultSettings = { maxMonthly: 10, maxConcurrent: 5 };
 const defaultSender = { company:"株式会社M-True", representative:"代表取締役 山下 真由", zip:"〒6590043", address:"兵庫県芦屋市潮見町28-1", tel:"TEL: 0797-23-6614", email:"7mayu2mayu@gmail.com", registration:"登録番号: T7140001038168", bank:"三菱UFJ銀行 芦屋支店 店番483 普通 0207348 カブシキガイシャ エムトゥルー" };
 
@@ -894,10 +911,18 @@ function AppMain(){
   const [showSenderSettings,setShowSenderSettings]=useState(false);
   const [loaded,setLoaded]=useState(false);
 
-  useEffect(()=>{let loaded_cases=null;try{const v=localStorage.getItem(STORAGE_KEYS.cases);if(v)loaded_cases=JSON.parse(v)}catch(e){}if(loaded_cases&&loaded_cases.length>0){setCases(loaded_cases)}else{setCases(SAMPLE_CASES)}try{const v=localStorage.getItem(STORAGE_KEYS.settings);if(v)setSettings(JSON.parse(v))}catch(e){}try{const v=localStorage.getItem(STORAGE_KEYS.sender);if(v)setSender(JSON.parse(v))}catch(e){}setLoaded(true)},[]);
-  useEffect(()=>{if(!loaded)return;try{localStorage.setItem(STORAGE_KEYS.cases,JSON.stringify(cases))}catch(e){}},[cases,loaded]);
-  useEffect(()=>{if(!loaded)return;try{localStorage.setItem(STORAGE_KEYS.settings,JSON.stringify(settings))}catch(e){}},[settings,loaded]);
-  useEffect(()=>{if(!loaded)return;try{localStorage.setItem(STORAGE_KEYS.sender,JSON.stringify(sender))}catch(e){}},[sender,loaded]);
+  useEffect(()=>{
+    (async()=>{
+      const [c,s,sn] = await Promise.all([sbGet("cases","cases"),sbGet("cases","settings"),sbGet("cases","sender")]);
+      setCases(c&&c.length>0 ? c : SAMPLE_CASES);
+      if(s) setSettings(s);
+      if(sn) setSender(sn);
+      setLoaded(true);
+    })();
+  },[]);
+  useEffect(()=>{if(!loaded)return; sbGet("cases","cases").then(()=>{}); sbSet("cases","cases",cases);},[cases,loaded]);
+  useEffect(()=>{if(!loaded)return; sbSet("cases","settings",settings);},[settings,loaded]);
+  useEffect(()=>{if(!loaded)return; sbSet("cases","sender",sender);},[sender,loaded]);
 
   const saveNew=f=>{setCases(p=>[...p,{...f,shopInfo:f.shopInfo||{nameJa:"",addressJa:"",url:""},id:genId(),createdAt:new Date().toISOString(),done:false,status:f.status||"acquired"}]);setShowNew(false)};
   const saveEdit=f=>{setCases(p=>p.map(c=>c.id===editCase.id?{...c,...f}:c));setEditCase(null);setDetailCase(null)};
