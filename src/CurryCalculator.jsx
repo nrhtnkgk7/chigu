@@ -60,8 +60,9 @@ function calcIngredient(ing) {
   const needed       = Math.ceil(actualUse / capacity);          // 必要購入数
   const purchaseCost = needed * price;                           // 購入原価
   const actualCost   = Math.round(price * (actualUse / capacity)); // 実原価（使用量比）
-  const leftover     = Math.round(capacity * needed - actualUse);  // 余り量
-  return { needed, purchaseCost, actualCost, leftover };
+  const leftover      = Math.round(capacity * needed - actualUse);           // 余り量
+  const leftoverCost  = Math.round(price * (leftover / capacity));            // 余り原価
+  return { needed, purchaseCost, actualCost, leftover, leftoverCost };
 }
 
 const UNITS = ["g", "kg", "ml", "L", "個", "枚", "本", "袋", "缶", "パック"];
@@ -288,7 +289,7 @@ const styles = `
   /* 計算結果グリッド */
   .c-ing-calc {
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, 1fr);
     gap: 6px;
     padding: 10px 12px;
     background: #fdf8ee;
@@ -296,7 +297,7 @@ const styles = `
     margin-bottom: 10px;
     border: 1px solid rgba(180,120,40,0.12);
   }
-  @media (max-width: 480px) {
+  @media (max-width: 520px) {
     .c-ing-calc { grid-template-columns: 1fr 1fr; }
   }
   .c-calc-item {}
@@ -486,9 +487,10 @@ export default function CurryCalculator() {
   const removeIngredient = (id) => setIngredients(prev => prev.filter(i => i.id !== id));
 
   const getSubtotal = (ing) => calcIngredient(ing).purchaseCost;
-  const totalCost     = ingredients.reduce((s, i) => s + calcIngredient(i).purchaseCost, 0);
-  const totalActual   = ingredients.reduce((s, i) => s + calcIngredient(i).actualCost,   0);
-  const costPerPerson = servings > 0 ? Math.ceil(totalActual / servings) : 0;
+  const totalCost              = ingredients.reduce((s, i) => s + calcIngredient(i).purchaseCost, 0);
+  const totalActual            = ingredients.reduce((s, i) => s + calcIngredient(i).actualCost,   0);
+  const costPerPerson          = servings > 0 ? Math.ceil(totalActual   / servings) : 0;
+  const purchaseCostPerPerson  = servings > 0 ? Math.ceil(totalCost     / servings) : 0;
 
   const capPerPersonStr = () => {
     const byUnit = {};
@@ -546,13 +548,13 @@ export default function CurryCalculator() {
               <div className="c-summary-grid">
                 <div className="c-summary-card">
                   <div className="sl">Total Cost</div>
-                  <div className="sv">¥{totalCost.toLocaleString()}</div>
-                  <div className="ss">購入原価合計（実：¥{totalActual.toLocaleString()}）</div>
+                  <div className="sv">¥{totalCost.toLocaleString()} <span style={{fontSize:16,fontWeight:500,color:"#7a6040"}}>(実 ¥{totalActual.toLocaleString()})</span></div>
+                  <div className="ss">(損 ¥{(totalCost - totalActual).toLocaleString()})</div>
                 </div>
                 <div className="c-summary-card">
                   <div className="sl">Cost / Person</div>
-                  <div className="sv">¥{costPerPerson.toLocaleString()}</div>
-                  <div className="ss">1人あたり実原価</div>
+                  <div className="sv">¥{purchaseCostPerPerson.toLocaleString()} <span style={{fontSize:16,fontWeight:500,color:"#7a6040"}}>(実 ¥{costPerPerson.toLocaleString()})</span></div>
+                  <div className="ss">(損 ¥{(purchaseCostPerPerson - costPerPerson).toLocaleString()})</div>
                 </div>
                 <div className="c-summary-card">
                   <div className="sl">Amount / Person</div>
@@ -644,6 +646,10 @@ export default function CurryCalculator() {
                           <div className="c-calc-item">
                             <div className="c-calc-label">余り量</div>
                             <div className="c-calc-value muted">{c.leftover}{ing.unit}</div>
+                          </div>
+                          <div className="c-calc-item">
+                            <div className="c-calc-label">余り原価</div>
+                            <div className="c-calc-value muted">¥{c.leftoverCost.toLocaleString()}</div>
                           </div>
                         </div>
                       );
