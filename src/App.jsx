@@ -1,4 +1,6 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import CurryCalculator from "./CurryCalculator";
 
 const STORAGE_KEYS = { cases: "cases-data", settings: "monthly-settings", pin: "app-pin", sender: "sender-info" };
 const defaultSettings = { maxMonthly: 10, maxConcurrent: 5 };
@@ -957,6 +959,16 @@ function AppMain(){
   </div>;
 }
 export default function App(){
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/curry" element={<CurryCalculator />} />
+        <Route path="*" element={<AppLocked />} />
+      </Routes>
+    </BrowserRouter>
+  );
+}
+function AppLocked(){
   const [unlocked,setUnlocked]=useState(false);
   if(!unlocked) return <LockScreen onUnlock={()=>setUnlocked(true)}/>;
   return <AppMain/>;
