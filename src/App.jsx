@@ -5,7 +5,7 @@ import CurryCalculator from "./CurryCalculator";
 const STORAGE_KEYS = { cases: "cases-data", settings: "monthly-settings", pin: "app-pin", sender: "sender-info" };
 
 /* ── Supabase ── */
-const SB_URL = "https://thukhxeznpnwfqtoehyvc.supabase.co";
+const SB_URL = "https://thukxeznpnwfqtoehyvc.supabase.co";
 const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRodWt4ZXpucG53ZnF0b2VoeXZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4Mzk1NTMsImV4cCI6MjA4ODQxNTU1M30._ZqXyb1slx-8WNmebptkeTNJdv-aUlJGRAwJZdsFkqo";
 const sbHeaders = { "Content-Type":"application/json", "apikey":SB_KEY, "Authorization":`Bearer ${SB_KEY}`, "Prefer":"resolution=merge-duplicates" };
 async function sbGet(table, id) {
