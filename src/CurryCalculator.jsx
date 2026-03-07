@@ -15,19 +15,29 @@ async function sbLoad() {
 }
 
 async function sbSave(data) {
-  // DELETE → INSERT でupsert（最も確実）
-  await fetch(`${SB_URL}/rest/v1/curry?id=eq.main`, {
-    method: "DELETE",
-    headers: sbBase,
+  // Step1: 既存レコードをPATCHで更新試行
+  const patch = await fetch(`${SB_URL}/rest/v1/curry?id=eq.main`, {
+    method: "PATCH",
+    headers: { ...sbBase, "Prefer": "return=representation" },
+    body: JSON.stringify({ data }),
   });
-  const r = await fetch(`${SB_URL}/rest/v1/curry`, {
-    method: "POST",
-    headers: { ...sbBase, "Prefer": "return=minimal" },
-    body: JSON.stringify({ id: "main", data }),
-  });
-  if (!r.ok) {
-    const msg = await r.text().catch(() => "不明なエラー");
-    throw new Error(msg);
+  if (!patch.ok) {
+    const msg = await patch.text().catch(() => "");
+    throw new Error(`更新失敗(${patch.status}): ${msg}`);
+  }
+  const patched = await patch.json();
+
+  // Step2: 更新された行が0件なら新規INSERT
+  if (!patched || patched.length === 0) {
+    const post = await fetch(`${SB_URL}/rest/v1/curry`, {
+      method: "POST",
+      headers: { ...sbBase, "Prefer": "return=minimal" },
+      body: JSON.stringify({ id: "main", data }),
+    });
+    if (!post.ok) {
+      const msg = await post.text().catch(() => "");
+      throw new Error(`登録失敗(${post.status}): ${msg}`);
+    }
   }
 }
 
@@ -399,6 +409,7 @@ export default function CurryCalculator() {
   const [recipe, setRecipe] = useState("");
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error
+  const [errorMsg, setErrorMsg] = useState("");
 
   useEffect(() => {
     sbLoad().then(d => {
@@ -419,7 +430,8 @@ export default function CurryCalculator() {
       setTimeout(() => setSaveState("idle"), 2500);
     } catch (e) {
       setSaveState("error");
-      setTimeout(() => setSaveState("idle"), 3000);
+      setErrorMsg(e.message || "不明なエラー");
+      setTimeout(() => { setSaveState("idle"); setErrorMsg(""); }, 5000);
     }
   };
 
@@ -462,13 +474,16 @@ export default function CurryCalculator() {
               <div className="c-logo-sub">Recipe Studio</div>
             </div>
           </div>
-          <button
-            className={`btn-save ${saveState}`}
-            onClick={handleSave}
-            disabled={saveState === "saving" || loading}
-          >
-            {saveLabel}
-          </button>
+          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+            <button
+              className={`btn-save ${saveState}`}
+              onClick={handleSave}
+              disabled={saveState === "saving" || loading}
+            >
+              {saveLabel}
+            </button>
+            {errorMsg && <span style={{fontSize:10,color:"#d04440",maxWidth:180,textAlign:"right",lineHeight:1.3}}>{errorMsg}</span>}
+          </div>
         </header>
 
         <main className="c-main">
