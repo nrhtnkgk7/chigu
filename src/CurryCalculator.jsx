@@ -47,9 +47,22 @@ const defaultIngredient = () => ({
   capacity: "",
   unit: "g",
   price: "",
-  quantity: "1",
+  actualUse: "",
   note: "",
 });
+
+// 1商品の計算ロジック
+function calcIngredient(ing) {
+  const capacity  = parseFloat(ing.capacity)  || 0;
+  const price     = parseFloat(ing.price)     || 0;
+  const actualUse = parseFloat(ing.actualUse) || 0;
+  if (capacity <= 0 || actualUse <= 0) return { needed: 0, purchaseCost: 0, actualCost: 0, leftover: 0 };
+  const needed       = Math.ceil(actualUse / capacity);          // 必要購入数
+  const purchaseCost = needed * price;                           // 購入原価
+  const actualCost   = Math.round(price * (actualUse / capacity)); // 実原価（使用量比）
+  const leftover     = Math.round(capacity * needed - actualUse);  // 余り量
+  return { needed, purchaseCost, actualCost, leftover };
+}
 
 const UNITS = ["g", "kg", "ml", "L", "個", "枚", "本", "袋", "缶", "パック"];
 
@@ -264,13 +277,45 @@ const styles = `
 
   .c-ing-row2 {
     display: grid;
-    grid-template-columns: 2fr 1.2fr 2fr 1.2fr;
+    grid-template-columns: 2fr 1.2fr 2fr 2fr;
     gap: 8px;
     margin-bottom: 10px;
   }
-  @media (max-width: 400px) {
+  @media (max-width: 480px) {
     .c-ing-row2 { grid-template-columns: 1fr 1fr; }
   }
+
+  /* 計算結果グリッド */
+  .c-ing-calc {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 6px;
+    padding: 10px 12px;
+    background: #fdf8ee;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    border: 1px solid rgba(180,120,40,0.12);
+  }
+  @media (max-width: 480px) {
+    .c-ing-calc { grid-template-columns: 1fr 1fr; }
+  }
+  .c-calc-item {}
+  .c-calc-label {
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    color: rgba(140,100,40,0.55);
+    font-weight: 600;
+    text-transform: uppercase;
+    margin-bottom: 3px;
+  }
+  .c-calc-value {
+    font-size: 14px;
+    font-weight: 700;
+    color: #7a4e10;
+    line-height: 1.2;
+  }
+  .c-calc-value.accent { color: #2a8a5a; }
+  .c-calc-value.muted  { color: #9e8060; }
   .c-ing-field label {
     display: block;
     font-size: 9px;
@@ -440,17 +485,18 @@ export default function CurryCalculator() {
   const addIngredient = () => setIngredients(prev => [...prev, defaultIngredient()]);
   const removeIngredient = (id) => setIngredients(prev => prev.filter(i => i.id !== id));
 
-  const getSubtotal = (ing) => (parseFloat(ing.price) || 0) * (parseFloat(ing.quantity) || 0);
-  const totalCost = ingredients.reduce((s, i) => s + getSubtotal(i), 0);
-  const costPerPerson = servings > 0 ? Math.ceil(totalCost / servings) : 0;
+  const getSubtotal = (ing) => calcIngredient(ing).purchaseCost;
+  const totalCost     = ingredients.reduce((s, i) => s + calcIngredient(i).purchaseCost, 0);
+  const totalActual   = ingredients.reduce((s, i) => s + calcIngredient(i).actualCost,   0);
+  const costPerPerson = servings > 0 ? Math.ceil(totalActual / servings) : 0;
 
   const capPerPersonStr = () => {
     const byUnit = {};
     ingredients.forEach(i => {
-      if (!i.name || !i.capacity) return;
+      if (!i.name || !i.actualUse) return;
       const u = i.unit || "g";
-      const cap = (parseFloat(i.capacity) || 0) * (parseFloat(i.quantity) || 0);
-      if (cap > 0) byUnit[u] = (byUnit[u] || 0) + cap;
+      const v = parseFloat(i.actualUse) || 0;
+      if (v > 0) byUnit[u] = (byUnit[u] || 0) + v;
     });
     if (servings <= 0 || Object.keys(byUnit).length === 0) return "—";
     return Object.entries(byUnit).map(([u, v]) => `${(v / servings).toFixed(1)}${u}`).join(" + ");
@@ -501,12 +547,12 @@ export default function CurryCalculator() {
                 <div className="c-summary-card">
                   <div className="sl">Total Cost</div>
                   <div className="sv">¥{totalCost.toLocaleString()}</div>
-                  <div className="ss">材料費合計</div>
+                  <div className="ss">購入原価合計（実：¥{totalActual.toLocaleString()}）</div>
                 </div>
                 <div className="c-summary-card">
                   <div className="sl">Cost / Person</div>
                   <div className="sv">¥{costPerPerson.toLocaleString()}</div>
-                  <div className="ss">1人あたり原価</div>
+                  <div className="ss">1人あたり実原価</div>
                 </div>
                 <div className="c-summary-card">
                   <div className="sl">Amount / Person</div>
@@ -551,11 +597,11 @@ export default function CurryCalculator() {
                       <button className="c-btn-del" onClick={() => removeIngredient(ing.id)}>×</button>
                     </div>
 
-                    {/* 容量 / 単位 / 値段 / 個数 */}
+                    {/* 販売容量 / 単位 / 値段 / 実使用量 */}
                     <div className="c-ing-row2">
                       <div className="c-ing-field">
-                        <label>容量</label>
-                        <input className="c-ing-input num" type="number" min="0" placeholder="200"
+                        <label>販売容量</label>
+                        <input className="c-ing-input num" type="number" min="0" placeholder="235"
                           value={ing.capacity} onChange={e => updateIngredient(ing.id, "capacity", e.target.value)} />
                       </div>
                       <div className="c-ing-field">
@@ -566,22 +612,48 @@ export default function CurryCalculator() {
                         </select>
                       </div>
                       <div className="c-ing-field">
-                        <label>値段（円）</label>
-                        <input className="c-ing-input num" type="number" min="0" placeholder="0"
+                        <label>1個の値段（円）</label>
+                        <input className="c-ing-input num" type="number" min="0" placeholder="200"
                           value={ing.price} onChange={e => updateIngredient(ing.id, "price", e.target.value)} />
                       </div>
                       <div className="c-ing-field">
-                        <label>個数</label>
-                        <input className="c-ing-input num" type="number" min="1" placeholder="1"
-                          value={ing.quantity} onChange={e => updateIngredient(ing.id, "quantity", e.target.value)} />
+                        <label>実際に使う量</label>
+                        <input className="c-ing-input num" type="number" min="0" placeholder="200"
+                          value={ing.actualUse} onChange={e => updateIngredient(ing.id, "actualUse", e.target.value)} />
                       </div>
                     </div>
+
+                    {/* 自動計算結果 */}
+                    {(() => {
+                      const c = calcIngredient(ing);
+                      if (c.needed === 0) return null;
+                      return (
+                        <div className="c-ing-calc">
+                          <div className="c-calc-item">
+                            <div className="c-calc-label">必要購入数</div>
+                            <div className="c-calc-value accent">{c.needed} 個</div>
+                          </div>
+                          <div className="c-calc-item">
+                            <div className="c-calc-label">購入原価</div>
+                            <div className="c-calc-value">¥{c.purchaseCost.toLocaleString()}</div>
+                          </div>
+                          <div className="c-calc-item">
+                            <div className="c-calc-label">実原価</div>
+                            <div className="c-calc-value accent">¥{c.actualCost.toLocaleString()}</div>
+                          </div>
+                          <div className="c-calc-item">
+                            <div className="c-calc-label">余り量</div>
+                            <div className="c-calc-value muted">{c.leftover}{ing.unit}</div>
+                          </div>
+                        </div>
+                      );
+                    })()}
 
                     {/* 備考 + 小計 */}
                     <div className="c-ing-row3">
                       <input className="c-ing-note" placeholder="備考（産地・ブランドなど）"
                         value={ing.note} onChange={e => updateIngredient(ing.id, "note", e.target.value)} />
-                      <div className="c-ing-subtotal">小計：¥{getSubtotal(ing).toLocaleString()}</div>
+                      <div className="c-ing-subtotal">購入原価：¥{getSubtotal(ing).toLocaleString()}</div>
                     </div>
                   </div>
                 ))}
