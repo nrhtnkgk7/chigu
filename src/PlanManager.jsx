@@ -754,7 +754,7 @@ export default function PlanManager() {
     name: '', url: '', address: '', date: '', time: '', status: '未定', genre: '', memo: '',
   });
   const [newProjectName, setNewProjectName] = useState('');
-  const [copySuccess, setCopySuccess] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(null); // null | 'link' | 'text'
 
   const exportRef = useRef(null);
 
@@ -1007,6 +1007,7 @@ export default function PlanManager() {
 
   function openEdit(item) {
     setEditItem(item);
+    setPasteText('');
     setFormData({
       name: item.name || '',
       url: item.url || '',
@@ -1029,22 +1030,62 @@ export default function PlanManager() {
   async function copyShareUrl() {
     try {
       await navigator.clipboard.writeText(getShareUrl());
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      setCopySuccess('link');
+      setTimeout(() => setCopySuccess(null), 2000);
     } catch {
-      // fallback
       const ta = document.createElement('textarea');
       ta.value = getShareUrl();
       document.body.appendChild(ta);
       ta.select();
       document.execCommand('copy');
       document.body.removeChild(ta);
-      setCopySuccess(true);
-      setTimeout(() => setCopySuccess(false), 2000);
+      setCopySuccess('link');
+      setTimeout(() => setCopySuccess(null), 2000);
     }
   }
 
   // ── Export ──
+  function generateTextSchedule() {
+    const { groups, sortedDates, undecided } = groupByDate(items);
+    let text = '';
+    for (const date of sortedDates) {
+      text += formatDate(date) + '\n';
+      for (const item of groups[date]) {
+        text += (item.time || '---') + ' ' + item.name;
+        if (item.url) text += ' ' + item.url;
+        text += '\n';
+      }
+      text += '\n';
+    }
+    if (undecided.length > 0) {
+      text += '日程未定\n';
+      for (const item of undecided) {
+        text += (item.time || '---') + ' ' + item.name;
+        if (item.url) text += ' ' + item.url;
+        text += '\n';
+      }
+    }
+    return text.trim();
+  }
+
+  async function copyTextSchedule() {
+    const text = generateTextSchedule();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopySuccess('text');
+      setTimeout(() => setCopySuccess(null), 2000);
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      setCopySuccess('text');
+      setTimeout(() => setCopySuccess(null), 2000);
+    }
+  }
+
   async function exportSchedule(format) {
     const el = exportRef.current;
     if (!el) return;
@@ -1430,6 +1471,44 @@ export default function PlanManager() {
               {editItem ? 'スポット編集' : 'スポット追加'}
             </div>
 
+            {/* NAVER MAP paste for overwrite (edit mode only) */}
+            {editItem && (
+              <div style={{ marginBottom: 16, padding: 14, background: C.bg, borderRadius: 12, border: `1px dashed ${C.border}` }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: C.textSub, marginBottom: 8 }}>
+                  📍 NAVER MAPで上書き
+                </div>
+                <textarea
+                  style={{ ...styles.textarea, minHeight: 80, fontSize: 14 }}
+                  placeholder={`NAVER MAPのコピーを貼り付け\n→ 店名・住所・URLを上書きします`}
+                  value={pasteText}
+                  onChange={e => setPasteText(e.target.value)}
+                  rows={3}
+                />
+                {pasteText && (() => {
+                  const p = parseNaverMap(pasteText);
+                  return (
+                    <div style={{ marginTop: 8 }}>
+                      <div style={{ fontSize: 12, color: C.textSub, marginBottom: 4 }}>
+                        プレビュー: {p.name || '—'} / {p.address || '—'}
+                      </div>
+                      <button
+                        style={{ ...baseBtn, background: C.accent, color: C.white, padding: '8px 16px', fontSize: 13, marginTop: 4 }}
+                        onClick={() => {
+                          setFormData(prev => ({
+                            ...prev,
+                            name: p.name || prev.name,
+                            url: p.url || prev.url,
+                            address: p.address || prev.address,
+                          }));
+                          setPasteText('');
+                        }}
+                      >上書き反映</button>
+                    </div>
+                  );
+                })()}
+              </div>
+            )}
+
             <label style={styles.label}>店名 / スポット名 *</label>
             <input
               style={styles.input}
@@ -1544,12 +1623,20 @@ export default function PlanManager() {
             <div style={styles.shareBox}>
               <span style={styles.shareUrl}>{getShareUrl()}</span>
               <button style={styles.copyBtn} onClick={copyShareUrl}>
-                {copySuccess ? '✓' : 'コピー'}
+                {copySuccess === 'link' ? '✓' : 'コピー'}
               </button>
             </div>
             <div style={{ fontSize: 11, color: C.textLight, marginTop: 6 }}>
               このリンクを共有すると、誰でもスケジュールを閲覧できます
             </div>
+
+            <label style={{ ...styles.label, marginTop: 24 }}>テキスト出力</label>
+            <div style={{ background: C.bg, borderRadius: 10, padding: 12, maxHeight: 180, overflow: 'auto', fontSize: 13, color: C.text, whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'monospace', border: `1px solid ${C.border}` }}>
+              {generateTextSchedule() || 'スケジュールがありません'}
+            </div>
+            <button style={{ ...styles.secondaryBtn, marginTop: 8 }} onClick={copyTextSchedule}>
+              {copySuccess === 'text' ? '✓ コピー済み' : '📋 テキストをコピー'}
+            </button>
 
             <label style={{ ...styles.label, marginTop: 24 }}>ダウンロード</label>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
