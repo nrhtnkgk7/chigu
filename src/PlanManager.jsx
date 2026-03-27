@@ -542,6 +542,11 @@ function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange }) {
               onClick={e => e.stopPropagation()} title="地図を開く">📍</a>
           )}
           <span style={styles.statusBadge(item.status)}>{item.status}</span>
+          {item.price != null && (
+            <span style={{ fontSize: 12, fontWeight: 600, color: '#e65100' }}>
+              ₩{Number(item.price).toLocaleString()}
+            </span>
+          )}
         </div>
         {item.genre && <div style={styles.itemSub}>{item.genre}</div>}
         {item.address && <div style={styles.itemSub}>{item.address}</div>}
@@ -582,9 +587,8 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
   const [overIdx, setOverIdx] = useState(null);
   const containerRef = useRef(null);
   const rectsRef = useRef([]);
-  const dragRef = useRef({ active: false, timer: null, startY: 0 });
+  const dragRef = useRef({ active: false, timer: null, startY: 0, rafId: null, lastOverIdx: -1 });
 
-  // Record all card positions when drag starts
   function recordRects() {
     if (!containerRef.current) return;
     const cards = containerRef.current.querySelectorAll('[data-sort-idx]');
@@ -594,7 +598,6 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
     });
   }
 
-  // Find which index a Y position falls into
   function idxFromY(clientY) {
     const y = clientY + window.scrollY;
     for (let i = 0; i < rectsRef.current.length; i++) {
@@ -607,9 +610,11 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
 
   function cleanup() {
     clearTimeout(dragRef.current.timer);
+    if (dragRef.current.rafId) cancelAnimationFrame(dragRef.current.rafId);
     document.body.style.overflow = '';
     document.body.style.touchAction = '';
     dragRef.current.active = false;
+    dragRef.current.lastOverIdx = -1;
     setDragIdx(null);
     setOverIdx(null);
   }
@@ -620,7 +625,6 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
     const el = e.target.closest('[data-sort-idx]');
     if (!el) return;
     const idx = parseInt(el.getAttribute('data-sort-idx'));
-
     const touch = e.touches[0];
     dragRef.current.startY = touch.clientY;
 
@@ -629,27 +633,36 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
       recordRects();
       setDragIdx(idx);
       setOverIdx(idx);
-      if (navigator.vibrate) navigator.vibrate(20);
+      dragRef.current.lastOverIdx = idx;
+      if (navigator.vibrate) navigator.vibrate(15);
       document.body.style.overflow = 'hidden';
       document.body.style.touchAction = 'none';
-    }, 200);
+    }, 150);
   }
 
   function onTouchMove(e) {
     if (!dragRef.current.active) {
       const dy = Math.abs(e.touches[0].clientY - dragRef.current.startY);
-      if (dy > 8) { clearTimeout(dragRef.current.timer); }
+      if (dy > 10) clearTimeout(dragRef.current.timer);
       return;
     }
     e.preventDefault();
     const touch = e.touches[0];
-    const newOver = idxFromY(touch.clientY);
-    setOverIdx(newOver);
 
     // Auto-scroll at edges
-    const edge = 80, speed = 10;
+    const edge = 80, speed = 12;
     if (touch.clientY < edge) window.scrollBy(0, -speed);
     else if (touch.clientY > window.innerHeight - edge) window.scrollBy(0, speed);
+
+    // RAF throttle — only update state once per frame
+    if (dragRef.current.rafId) cancelAnimationFrame(dragRef.current.rafId);
+    dragRef.current.rafId = requestAnimationFrame(() => {
+      const newOver = idxFromY(touch.clientY);
+      if (newOver !== dragRef.current.lastOverIdx) {
+        dragRef.current.lastOverIdx = newOver;
+        setOverIdx(newOver);
+      }
+    });
   }
 
   function onTouchEnd() {
@@ -659,7 +672,6 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
     cleanup();
   }
 
-  // Build display order: if dragging, show items in reordered preview
   const displayItems = (() => {
     if (dragIdx === null || overIdx === null || dragIdx === overIdx) return flatItems;
     const arr = [...flatItems];
@@ -669,6 +681,7 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
   })();
 
   const draggingItem = dragIdx !== null ? flatItems[dragIdx] : null;
+  const isDragging = dragIdx !== null;
 
   return (
     <div
@@ -682,6 +695,10 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
       {displayItems.map((item, idx) => {
         const isDraggedItem = draggingItem && item.id === draggingItem.id;
 
+        const hasPrice = item.price != null;
+        const cardBg = isDraggedItem ? C.confirmedBg : hasPrice ? '#fff8f0' : C.card;
+        const cardBorderLeft = isDraggedItem ? `4px solid ${C.confirmed}` : hasPrice ? `3px solid #ffb74d` : `1px solid ${C.borderLight}`;
+
         return (
           <div key={item.id}>
             {renderSectionHeader && renderSectionHeader(item, idx, displayItems)}
@@ -689,10 +706,10 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
               data-sort-idx={idx}
               style={{
                 ...styles.itemCard,
-                background: isDraggedItem ? C.confirmedBg : C.card,
-                borderLeft: isDraggedItem ? `4px solid ${C.confirmed}` : `1px solid ${C.borderLight}`,
+                background: cardBg,
+                borderLeft: cardBorderLeft,
                 boxShadow: isDraggedItem ? '0 2px 12px rgba(0,0,0,0.1)' : 'none',
-                transition: 'all 0.15s ease',
+                transition: isDragging ? 'none' : 'all 0.15s ease',
               }}
             >
               {renderItem(item, idx)}
@@ -723,7 +740,7 @@ export default function PlanManager() {
   // Form states
   const [pasteText, setPasteText] = useState('');
   const [formData, setFormData] = useState({
-    name: '', url: '', address: '', date: '', time: '', status: '未定', genre: '', memo: '',
+    name: '', url: '', address: '', date: '', time: '', status: '未定', genre: '', memo: '', price: '',
   });
   const [newProjectName, setNewProjectName] = useState('');
   const [copySuccess, setCopySuccess] = useState(null); // null | 'link' | 'text'
@@ -732,6 +749,29 @@ export default function PlanManager() {
 
   function handleTimeChange(id, time) {
     updateItem(id, { time });
+    // Auto-sort within same date by time
+    setTimeout(() => {
+      setItems(prev => {
+        const item = prev.find(i => i.id === id);
+        if (!item || !item.date) return prev;
+        const sameDate = prev.filter(i => i.date === item.date).sort((a, b) => {
+          const ta = a.id === id ? (time || '') : (a.time || '');
+          const tb = b.id === id ? (time || '') : (b.time || '');
+          if (!ta && !tb) return 0;
+          if (!ta) return 1;
+          if (!tb) return -1;
+          return ta.localeCompare(tb);
+        });
+        // Re-assign sort_order within this date
+        const otherItems = prev.filter(i => i.date !== item.date);
+        const minOrder = Math.min(...sameDate.map(i => i.sort_order ?? 0));
+        const reordered = sameDate.map((it, i) => ({ ...it, sort_order: minOrder + i }));
+        reordered.forEach(it => {
+          supabase.from('plan_items').update({ sort_order: it.sort_order }).eq('id', it.id);
+        });
+        return [...otherItems, ...reordered];
+      });
+    }, 100);
   }
 
   function handleDateChange(id, date) {
@@ -960,6 +1000,7 @@ export default function PlanManager() {
       status: formData.status,
       genre: formData.genre || null,
       memo: formData.memo || null,
+      price: formData.price !== '' ? parseInt(formData.price) : null,
     };
     if (editItem) {
       updateItem(editItem.id, data);
@@ -973,7 +1014,7 @@ export default function PlanManager() {
 
   function resetForm() {
     setFormData({
-      name: '', url: '', address: '', date: '', time: '', status: '未定', genre: '', memo: '',
+      name: '', url: '', address: '', date: '', time: '', status: '未定', genre: '', memo: '', price: '',
     });
   }
 
@@ -989,6 +1030,7 @@ export default function PlanManager() {
       status: item.status || '未定',
       genre: item.genre || '',
       memo: item.memo || '',
+      price: item.price != null ? String(item.price) : '',
     });
     setModal('edit');
   }
@@ -1537,6 +1579,16 @@ export default function PlanManager() {
               value={formData.genre}
               onChange={e => setFormData(p => ({ ...p, genre: e.target.value }))}
               placeholder="例: 韓国料理、カフェ"
+            />
+
+            <label style={styles.label}>金額（₩）</label>
+            <input
+              style={styles.input}
+              type="number"
+              inputMode="numeric"
+              value={formData.price}
+              onChange={e => setFormData(p => ({ ...p, price: e.target.value }))}
+              placeholder="例: 15000"
             />
 
             <label style={styles.label}>住所</label>
