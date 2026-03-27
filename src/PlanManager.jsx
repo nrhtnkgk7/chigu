@@ -70,16 +70,13 @@ function parseBulkSchedule(text, defaultYear) {
   const year = defaultYear || new Date().getFullYear();
 
   for (const line of lines) {
-    const dateMatch = line.match(/^(\d{1,2})\/(\d{1,2})$/);
-    const fullDateMatch = line.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+    // Match: 4/1, 4/1(水), 2025/4/1, 2025/4/1(水)
+    const dateMatch = line.match(/^(\d{4}\/)?(\d{1,2})\/(\d{1,2})(?:\s*[\(（][日月火水木金土][\)）])?$/);
     if (dateMatch) {
-      const m = dateMatch[1].padStart(2, '0');
-      const d = dateMatch[2].padStart(2, '0');
-      currentDate = `${year}-${m}-${d}`;
-    } else if (fullDateMatch) {
-      const m = fullDateMatch[2].padStart(2, '0');
-      const d = fullDateMatch[3].padStart(2, '0');
-      currentDate = `${fullDateMatch[1]}-${m}-${d}`;
+      const y = dateMatch[1] ? dateMatch[1].replace('/', '') : year;
+      const m = dateMatch[2].padStart(2, '0');
+      const d = dateMatch[3].padStart(2, '0');
+      currentDate = `${y}-${m}-${d}`;
     } else {
       const timeMatch = line.match(/^(\d{1,2}:\d{2})\s+(.+)$/);
       if (timeMatch) {
@@ -472,37 +469,106 @@ const styles = {
 };
 
 // ── Item Card Component ──
-function ItemCard({ item, onTap, readonly }) {
+function ItemCard({ item, onTap, readonly, onTimeChange, onDragStart, onDragOver, onDragEnd, onTouchStart, onTouchMove, onTouchEnd, isDragging }) {
+  const [editingTime, setEditingTime] = useState(false);
+  const [tempTime, setTempTime] = useState(item.time || '');
   const sc = STATUS_CONFIG[item.status] || STATUS_CONFIG['未定'];
+
+  function handleTimeSubmit() {
+    if (onTimeChange) onTimeChange(item.id, tempTime || null);
+    setEditingTime(false);
+  }
+
   return (
     <div
-      style={styles.itemCard}
-      onClick={() => !readonly && onTap && onTap(item)}
+      style={{
+        ...styles.itemCard,
+        opacity: isDragging ? 0.5 : 1,
+        transform: isDragging ? 'scale(1.02)' : 'none',
+        boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.15)' : 'none',
+        transition: isDragging ? 'none' : 'all 0.15s ease',
+      }}
+      draggable={!readonly}
+      onDragStart={onDragStart}
+      onDragOver={onDragOver}
+      onDragEnd={onDragEnd}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
     >
-      <div style={styles.itemTime}>
-        {item.time || '---'}
+      {/* Drag Handle */}
+      {!readonly && (
+        <div style={{
+          display: 'flex', alignItems: 'center', padding: '0 4px 0 0',
+          color: C.textLight, fontSize: 16, cursor: 'grab', touchAction: 'none',
+          userSelect: 'none', flexShrink: 0,
+        }}>
+          ⠿
+        </div>
+      )}
+
+      {/* Time - tap to edit */}
+      <div style={{ ...styles.itemTime, cursor: readonly ? 'default' : 'pointer', position: 'relative' }}>
+        {editingTime && !readonly ? (
+          <input
+            type="time"
+            value={tempTime}
+            onChange={e => setTempTime(e.target.value)}
+            onBlur={handleTimeSubmit}
+            onKeyDown={e => e.key === 'Enter' && handleTimeSubmit()}
+            autoFocus
+            style={{
+              width: 60, border: `1px solid ${C.accent}`, borderRadius: 6,
+              padding: '2px 4px', fontSize: 13, fontFamily: '"Noto Sans JP", sans-serif',
+              color: C.primary, background: C.white, outline: 'none',
+            }}
+            onClick={e => e.stopPropagation()}
+          />
+        ) : (
+          <span
+            onClick={e => {
+              if (readonly) return;
+              e.stopPropagation();
+              setTempTime(item.time || '');
+              setEditingTime(true);
+            }}
+            style={{
+              padding: '2px 4px', borderRadius: 6,
+              background: !readonly ? C.primaryBg : 'transparent',
+            }}
+          >
+            {item.time || '---'}
+          </span>
+        )}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+
+      {/* Content */}
+      <div style={{ flex: 1, minWidth: 0 }} onClick={() => !readonly && onTap && onTap(item)}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={styles.itemName}>{item.name}</span>
+          {item.url && (
+            <a
+              href={item.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                fontSize: 16, textDecoration: 'none', flexShrink: 0,
+                display: 'inline-flex', alignItems: 'center',
+              }}
+              onClick={e => e.stopPropagation()}
+              title="地図を開く"
+            >
+              📍
+            </a>
+          )}
           <span style={styles.statusBadge(item.status)}>{item.status}</span>
         </div>
         {item.genre && <div style={styles.itemSub}>{item.genre}</div>}
         {item.address && <div style={styles.itemSub}>{item.address}</div>}
         {item.memo && <div style={{ ...styles.itemSub, fontStyle: 'italic' }}>{item.memo}</div>}
-        {item.url && (
-          <a
-            href={item.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={styles.itemUrl}
-            onClick={e => e.stopPropagation()}
-          >
-            🔗 地図を開く
-          </a>
-        )}
       </div>
-      {!readonly && <span style={styles.chevron}>›</span>}
+
+      {!readonly && <span style={styles.chevron} onClick={() => onTap && onTap(item)}>›</span>}
     </div>
   );
 }
@@ -532,6 +598,94 @@ export default function PlanManager() {
   const [copySuccess, setCopySuccess] = useState(false);
 
   const exportRef = useRef(null);
+
+  // Drag and drop state
+  const [dragId, setDragId] = useState(null);
+  const [dragOverId, setDragOverId] = useState(null);
+  const touchState = useRef({ id: null, startY: 0, el: null, clone: null, moved: false, timer: null });
+
+  function handleTimeChange(id, time) {
+    updateItem(id, { time });
+  }
+
+  // Desktop drag handlers
+  function handleDragStart(e, item) {
+    setDragId(item.id);
+    e.dataTransfer.effectAllowed = 'move';
+  }
+  function handleDragOver(e, item) {
+    e.preventDefault();
+    if (item.id !== dragOverId) setDragOverId(item.id);
+  }
+  async function handleDragEnd() {
+    if (dragId && dragOverId && dragId !== dragOverId) {
+      await reorderItems(dragId, dragOverId);
+    }
+    setDragId(null);
+    setDragOverId(null);
+  }
+
+  // Touch drag handlers (long press)
+  function handleTouchStart(e, item) {
+    const touch = e.touches[0];
+    touchState.current.startY = touch.clientY;
+    touchState.current.id = item.id;
+    touchState.current.moved = false;
+    touchState.current.timer = setTimeout(() => {
+      setDragId(item.id);
+      touchState.current.moved = true;
+      if (navigator.vibrate) navigator.vibrate(30);
+    }, 400);
+  }
+  function handleTouchMove(e) {
+    if (!touchState.current.moved) {
+      const dy = Math.abs(e.touches[0].clientY - touchState.current.startY);
+      if (dy > 10 && !dragId) {
+        clearTimeout(touchState.current.timer);
+        return;
+      }
+    }
+    if (!dragId) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (el) {
+      const card = el.closest('[data-item-id]');
+      if (card) {
+        const overId = card.getAttribute('data-item-id');
+        if (overId !== dragOverId) setDragOverId(overId);
+      }
+    }
+  }
+  async function handleTouchEnd() {
+    clearTimeout(touchState.current.timer);
+    if (dragId && dragOverId && dragId !== dragOverId) {
+      await reorderItems(dragId, dragOverId);
+    }
+    setDragId(null);
+    setDragOverId(null);
+    touchState.current = { id: null, startY: 0, el: null, clone: null, moved: false, timer: null };
+  }
+
+  async function reorderItems(fromId, toId) {
+    const newItems = [...items];
+    const fromIdx = newItems.findIndex(i => i.id === fromId);
+    const toIdx = newItems.findIndex(i => i.id === toId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    // Also swap dates so item moves into the target's date group
+    const fromDate = newItems[fromIdx].date;
+    const toDate = newItems[toIdx].date;
+    const [moved] = newItems.splice(fromIdx, 1);
+    moved.date = toDate;
+    newItems.splice(toIdx, 0, moved);
+    // Update sort_order for all
+    const updates = newItems.map((it, i) => ({ ...it, sort_order: i }));
+    setItems(updates);
+    // Persist
+    for (const it of updates) {
+      await supabase.from('plan_items').update({ sort_order: it.sort_order, date: it.date }).eq('id', it.id);
+    }
+  }
 
   // ── Shared View ──
   useEffect(() => {
@@ -986,7 +1140,22 @@ export default function PlanManager() {
               </span>
             </div>
             {groups[date].map(item => (
-              <ItemCard key={item.id} item={item} onTap={openEdit} />
+              <div key={item.id} data-item-id={item.id} style={{
+                borderTop: dragOverId === item.id ? `2px solid ${C.accent}` : '2px solid transparent',
+              }}>
+                <ItemCard
+                  item={item}
+                  onTap={openEdit}
+                  onTimeChange={handleTimeChange}
+                  isDragging={dragId === item.id}
+                  onDragStart={e => handleDragStart(e, item)}
+                  onDragOver={e => handleDragOver(e, item)}
+                  onDragEnd={handleDragEnd}
+                  onTouchStart={e => handleTouchStart(e, item)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                />
+              </div>
             ))}
           </div>
         ))}
@@ -998,7 +1167,22 @@ export default function PlanManager() {
               <span style={{ fontSize: 12, fontWeight: 400 }}>{undecided.length}件</span>
             </div>
             {undecided.map(item => (
-              <ItemCard key={item.id} item={item} onTap={openEdit} />
+              <div key={item.id} data-item-id={item.id} style={{
+                borderTop: dragOverId === item.id ? `2px solid ${C.accent}` : '2px solid transparent',
+              }}>
+                <ItemCard
+                  item={item}
+                  onTap={openEdit}
+                  onTimeChange={handleTimeChange}
+                  isDragging={dragId === item.id}
+                  onDragStart={e => handleDragStart(e, item)}
+                  onDragOver={e => handleDragOver(e, item)}
+                  onDragEnd={handleDragEnd}
+                  onTouchStart={e => handleTouchStart(e, item)}
+                  onTouchMove={handleTouchMove}
+                  onTouchEnd={handleTouchEnd}
+                />
+              </div>
             ))}
           </div>
         )}
