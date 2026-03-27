@@ -1,6 +1,7 @@
 import { useState, useEffect, useLayoutEffect, useMemo, useRef, useCallback } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import CurryCalculator from "./CurryCalculator";
+import PlanManager from "./PlanManager";
 
 const STORAGE_KEYS = { cases: "cases-data", settings: "monthly-settings", pin: "app-pin", sender: "sender-info" };
 
@@ -988,6 +989,8 @@ export default function App(){
     <BrowserRouter>
       <Routes>
         <Route path="/curry" element={<CurryCalculator />} />
+        <Route path="/p" element={<PlanManager />} />
+        <Route path="/p/s/:shareId" element={<PlanManager />} />
         <Route path="*" element={<AppLocked />} />
       </Routes>
     </BrowserRouter>
