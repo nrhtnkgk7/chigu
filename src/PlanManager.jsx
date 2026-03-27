@@ -549,7 +549,6 @@ function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange }) {
           )}
         </div>
         {item.genre && <div style={styles.itemSub}>{item.genre}</div>}
-        {item.address && <div style={styles.itemSub}>{item.address}</div>}
         {item.memo && <div style={{ ...styles.itemSub, fontStyle: 'italic' }}>{item.memo}</div>}
 
         {/* Inline date for undecided */}
@@ -781,9 +780,12 @@ export default function PlanManager() {
   // Build flat ordered list from grouped data
   function buildFlatList() {
     const flat = [];
-    const { groups: g, sortedDates: sd, undecided: u } = groupByDate(
-      statusFilter === 'all' ? items : items.filter(it => it.status === statusFilter)
-    );
+    const filtered = statusFilter === 'all'
+      ? items
+      : statusFilter === 'price'
+      ? items.filter(it => it.price != null)
+      : items.filter(it => it.status === statusFilter);
+    const { groups: g, sortedDates: sd, undecided: u } = groupByDate(filtered);
     for (const d of sd) for (const it of g[d]) flat.push(it);
     for (const it of u) flat.push(it);
     return flat;
@@ -1138,6 +1140,8 @@ export default function PlanManager() {
   // ── Filtered Items ──
   const filteredItems = statusFilter === 'all'
     ? items
+    : statusFilter === 'price'
+    ? items.filter(it => it.price != null)
     : items.filter(it => it.status === statusFilter);
 
   const { groups, sortedDates, undecided } = groupByDate(filteredItems);
@@ -1285,7 +1289,39 @@ export default function PlanManager() {
               </button>
             );
           })}
+          <button
+            style={{
+              ...styles.tab(statusFilter === 'price'),
+              background: statusFilter === 'price' ? '#e65100' : C.card,
+              color: statusFilter === 'price' ? C.white : C.textSub,
+              borderColor: statusFilter === 'price' ? '#e65100' : C.border,
+            }}
+            onClick={() => setStatusFilter('price')}
+          >
+            ₩ 金額あり ({items.filter(it => it.price != null).length})
+          </button>
         </div>
+
+        {/* Price Summary */}
+        {(() => {
+          const priceItems = items.filter(it => it.price != null);
+          if (priceItems.length === 0) return null;
+          const total = priceItems.reduce((s, it) => s + (it.price || 0), 0);
+          return (
+            <div style={{
+              background: '#fff8f0', border: '1px solid #ffb74d', borderRadius: 10,
+              padding: '10px 14px', marginTop: 8, display: 'flex',
+              justifyContent: 'space-between', alignItems: 'center',
+            }}>
+              <span style={{ fontSize: 13, color: '#e65100', fontWeight: 600 }}>
+                💰 {priceItems.length}件
+              </span>
+              <span style={{ fontSize: 16, color: '#e65100', fontWeight: 700 }}>
+                合計 ₩{total.toLocaleString()}
+              </span>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Schedule Body */}
