@@ -15,7 +15,6 @@ async function sbLoad() {
 }
 
 async function sbSave(data) {
-  // Step1: 既存レコードをPATCHで更新試行
   const patch = await fetch(`${SB_URL}/rest/v1/curry?id=eq.main`, {
     method: "PATCH",
     headers: { ...sbBase, "Prefer": "return=representation" },
@@ -26,8 +25,6 @@ async function sbSave(data) {
     throw new Error(`更新失敗(${patch.status}): ${msg}`);
   }
   const patched = await patch.json();
-
-  // Step2: 更新された行が0件なら新規INSERT
   if (!patched || patched.length === 0) {
     const post = await fetch(`${SB_URL}/rest/v1/curry`, {
       method: "POST",
@@ -43,426 +40,577 @@ async function sbSave(data) {
 
 const defaultIngredient = () => ({
   id: Date.now().toString(36) + Math.random().toString(36).slice(2),
-  name: "",
-  capacity: "",
-  unit: "g",
-  price: "",
-  actualUse: "",
-  note: "",
+  name: "", capacity: "", unit: "g", price: "", actualUse: "", note: "",
 });
 
-// 1商品の計算ロジック
 function calcIngredient(ing) {
   const capacity  = parseFloat(ing.capacity)  || 0;
   const price     = parseFloat(ing.price)     || 0;
   const actualUse = parseFloat(ing.actualUse) || 0;
-  if (capacity <= 0 || actualUse <= 0) return { needed: 0, purchaseCost: 0, actualCost: 0, leftover: 0 };
-  const needed       = Math.ceil(actualUse / capacity);          // 必要購入数
-  const purchaseCost = needed * price;                           // 購入原価
-  const actualCost   = Math.round(price * (actualUse / capacity)); // 実原価（使用量比）
-  const leftover      = Math.round(capacity * needed - actualUse);           // 余り量
-  const leftoverCost  = Math.round(price * (leftover / capacity));            // 余り原価
+  if (capacity <= 0 || actualUse <= 0) return { needed: 0, purchaseCost: 0, actualCost: 0, leftover: 0, leftoverCost: 0 };
+  const needed      = Math.ceil(actualUse / capacity);
+  const purchaseCost = needed * price;
+  const actualCost  = Math.round(price * (actualUse / capacity));
+  const leftover    = Math.round(capacity * needed - actualUse);
+  const leftoverCost = Math.round(price * (leftover / capacity));
   return { needed, purchaseCost, actualCost, leftover, leftoverCost };
 }
 
 const UNITS = ["g", "kg", "ml", "L", "個", "枚", "本", "袋", "缶", "パック"];
 
+/* ─────────────────────────────────────────
+   STYLES
+───────────────────────────────────────── */
 const styles = `
-  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700&family=Playfair+Display:wght@400;700&display=swap');
+  @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&family=DM+Sans:wght@300;400;500;600&family=Noto+Sans+JP:wght@300;400;500;700&display=swap');
+
+  :root {
+    --bg:        #fdf8f1;
+    --surface:   #ffffff;
+    --surface2:  #faf5ec;
+    --border:    rgba(160,100,30,0.15);
+    --border2:   rgba(160,100,30,0.25);
+    --brown:     #2e1a08;
+    --brown2:    #5a3412;
+    --amber:     #c47c18;
+    --amber-dim: rgba(196,124,24,0.12);
+    --green:     #2a7a52;
+    --green-dim: rgba(42,122,82,0.1);
+    --muted:     #8a7060;
+    --danger:    #c43030;
+    --shadow-sm: 0 1px 4px rgba(80,40,0,0.07);
+    --shadow-md: 0 3px 14px rgba(80,40,0,0.09);
+    --r:         14px;
+    --r-sm:      9px;
+  }
 
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   body {
-    background: #faf7f2;
-    color: #3a2e1e;
-    font-family: 'Noto Sans JP', sans-serif;
+    background: var(--bg);
+    color: var(--brown);
+    font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
     min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
   }
 
-  .curry-app { min-height: 100vh; background: #faf7f2; }
+  /* ── Page fade-in ── */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+  .r-fade { animation: fadeUp 0.4s ease both; }
+  .r-fade-1 { animation-delay: 0.05s; }
+  .r-fade-2 { animation-delay: 0.10s; }
+  .r-fade-3 { animation-delay: 0.15s; }
+  .r-fade-4 { animation-delay: 0.20s; }
 
   /* ── Header ── */
-  .c-header {
-    border-bottom: 1px solid rgba(180,120,40,0.2);
-    padding: 0 20px;
-    background: rgba(250,247,242,0.97);
-    backdrop-filter: blur(12px);
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 60px;
+  .r-header {
+    position: sticky; top: 0; z-index: 200;
+    height: 56px;
+    padding: 0 18px;
+    background: rgba(253,248,241,0.95);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 12px;
   }
-  .c-header-left { display: flex; align-items: center; gap: 20px; }
-  .c-back {
-    color: rgba(160,110,40,0.75);
-    font-size: 12px;
+  .r-header-left { display: flex; align-items: center; gap: 16px; flex-shrink: 0; }
+  .r-back {
+    display: flex; align-items: center; gap: 5px;
+    font-size: 12px; font-weight: 500;
+    color: var(--muted);
     text-decoration: none;
-    letter-spacing: 0.06em;
-    font-weight: 500;
+    letter-spacing: 0.04em;
     transition: color 0.2s;
-  }
-  .c-back:hover { color: #a06820; }
-  .c-logo {
-    font-family: 'Playfair Display', serif;
-    font-size: 20px;
-    font-weight: 700;
-    color: #7a4e10;
-    letter-spacing: 0.04em;
-    line-height: 1;
-  }
-  .c-logo-sub {
-    font-size: 9px;
-    color: rgba(140,90,30,0.5);
-    letter-spacing: 0.16em;
-    font-weight: 300;
-    text-transform: uppercase;
-    margin-top: 2px;
-  }
-
-  /* ── Save Button ── */
-  .btn-save {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    padding: 8px 18px;
-    background: #7a4e10;
-    color: #fff;
-    border: none;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 700;
-    font-family: 'Noto Sans JP', sans-serif;
-    cursor: pointer;
-    transition: all 0.2s;
-    letter-spacing: 0.04em;
     white-space: nowrap;
   }
-  .btn-save:hover { background: #5c3a0a; }
-  .btn-save:disabled { background: #c8a878; cursor: not-allowed; }
-  .btn-save.saving { background: #a06820; }
-  .btn-save.saved { background: #2a8a5a; }
-  .btn-save.error { background: #d04440; }
+  .r-back:hover { color: var(--amber); }
+  .r-back-arrow { font-size: 14px; line-height: 1; }
+
+  .r-logo-wrap {}
+  .r-logo {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 22px; font-weight: 700;
+    color: var(--brown2);
+    letter-spacing: 0.03em;
+    line-height: 1;
+  }
+  .r-logo-sub {
+    font-size: 8px; font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-top: 1px;
+    opacity: 0.7;
+  }
+
+  /* ── Save button ── */
+  .r-save-btn {
+    height: 36px;
+    padding: 0 16px;
+    border: none; border-radius: 18px;
+    font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
+    font-size: 13px; font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+    white-space: nowrap;
+    background: var(--brown2);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(90,52,18,0.25);
+    letter-spacing: 0.03em;
+  }
+  .r-save-btn:active { transform: scale(0.97); }
+  .r-save-btn:disabled { background: #c0a880; box-shadow: none; cursor: not-allowed; }
+  .r-save-btn.saving { background: var(--amber); }
+  .r-save-btn.saved  { background: var(--green); box-shadow: 0 2px 8px rgba(42,122,82,0.3); }
+  .r-save-btn.error  { background: var(--danger); }
+  .r-error-msg {
+    font-size: 10px; color: var(--danger);
+    text-align: right; line-height: 1.3;
+    max-width: 160px;
+  }
 
   /* ── Main ── */
-  .c-main { max-width: 720px; margin: 0 auto; padding: 32px 16px 80px; }
-
-  .c-page-title { margin-bottom: 32px; }
-  .c-page-title h1 {
-    font-family: 'Playfair Display', serif;
-    font-size: 26px;
-    font-weight: 400;
-    color: #4a3010;
-    letter-spacing: 0.04em;
+  .r-main {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 28px 16px 100px;
   }
-  .c-subtitle {
-    font-size: 11px;
-    color: rgba(140,100,40,0.6);
-    letter-spacing: 0.14em;
-    margin-top: 4px;
-    font-weight: 300;
+
+  /* ── Page title ── */
+  .r-title-block { margin-bottom: 28px; }
+  .r-title {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px; font-weight: 600;
+    color: var(--brown);
+    letter-spacing: 0.02em;
+    line-height: 1.1;
+  }
+  .r-title-sub {
+    font-size: 10px; font-weight: 500;
+    color: var(--muted);
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-top: 5px;
+    opacity: 0.75;
   }
 
   /* ── Section label ── */
-  .c-section-label {
-    font-size: 10px;
-    letter-spacing: 0.2em;
-    color: rgba(140,100,40,0.65);
-    font-weight: 600;
-    text-transform: uppercase;
+  .r-section {
+    display: flex; align-items: center; gap: 10px;
     margin-bottom: 12px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
   }
-  .c-section-label::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: rgba(180,120,40,0.2);
+  .r-section-text {
+    font-size: 9px; font-weight: 600;
+    color: var(--muted);
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .r-section-line {
+    flex: 1; height: 1px;
+    background: var(--border);
   }
 
-  /* ── Summary Cards ── */
-  .c-summary-grid {
+  /* ── Summary grid ── */
+  .r-summary-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 10px;
-    margin-bottom: 28px;
+    margin-bottom: 24px;
   }
-  @media (max-width: 480px) {
-    .c-summary-grid { grid-template-columns: 1fr 1fr; }
-    .c-summary-grid .c-summary-card:last-child { grid-column: 1 / -1; }
+  @media (max-width: 500px) {
+    .r-summary-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+    .r-summary-grid .r-sum-card:last-child {
+      grid-column: 1 / -1;
+    }
   }
-  .c-summary-card {
-    background: #fff;
-    border: 1px solid rgba(180,120,40,0.2);
-    border-radius: 12px;
-    padding: 16px 18px;
+  .r-sum-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 14px 16px 12px;
     position: relative;
     overflow: hidden;
-    box-shadow: 0 1px 6px rgba(120,70,10,0.06);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s;
   }
-  .c-summary-card::before {
+  .r-sum-card::after {
     content: '';
     position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #c8882a, #e8a838, #c8882a);
+    bottom: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--amber), #e8a830);
+    opacity: 0.6;
   }
-  .sl { font-size: 9px; letter-spacing: 0.18em; color: rgba(140,100,40,0.6); font-weight: 600; margin-bottom: 8px; text-transform: uppercase; }
-  .sv { font-size: 22px; font-weight: 700; color: #3a2010; line-height: 1; }
-  .ss { font-size: 11px; color: rgba(120,80,30,0.5); margin-top: 5px; }
-
-  /* ── Servings ── */
-  .c-servings-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 16px 18px;
-    background: #fff;
-    border: 1px solid rgba(180,120,40,0.18);
-    border-radius: 12px;
-    margin-bottom: 28px;
-    box-shadow: 0 1px 6px rgba(120,70,10,0.06);
+  .r-sum-label {
+    font-size: 8px; font-weight: 600;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 7px;
+    opacity: 0.8;
   }
-  .c-servings-label { font-size: 13px; color: #4a3010; font-weight: 500; flex: 1; }
-  .c-stepper { display: flex; align-items: center; border: 1px solid rgba(180,120,40,0.3); border-radius: 8px; overflow: hidden; }
-  .c-step-btn {
-    width: 38px; height: 38px;
-    background: rgba(200,136,42,0.1);
-    border: none; color: #a06820; font-size: 20px;
-    cursor: pointer; transition: background 0.15s;
-    display: flex; align-items: center; justify-content: center;
+  .r-sum-value {
+    font-size: 20px; font-weight: 600;
+    color: var(--brown);
+    line-height: 1;
+    letter-spacing: -0.01em;
   }
-  .c-step-btn:hover { background: rgba(200,136,42,0.22); }
-  .c-step-num {
-    width: 52px; text-align: center;
-    font-size: 18px; font-weight: 700; color: #3a2010;
-    background: #fffdf8;
-    border: none;
-    border-left: 1px solid rgba(180,120,40,0.2);
-    border-right: 1px solid rgba(180,120,40,0.2);
-    padding: 8px 0; outline: none;
+  .r-sum-value .r-sum-actual {
+    font-size: 14px; font-weight: 500;
+    color: var(--muted);
+    margin-left: 3px;
   }
-  .c-servings-unit { font-size: 13px; color: rgba(140,100,40,0.6); }
-
-  /* ── Ingredient Cards ── */
-  .c-ing-list { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
-
-  .c-ing-card {
-    background: #fff;
-    border: 1px solid rgba(180,120,40,0.18);
-    border-radius: 12px;
-    padding: 14px 16px;
-    box-shadow: 0 1px 6px rgba(120,70,10,0.05);
+  .r-sum-sub {
+    font-size: 10px;
+    color: var(--danger);
+    margin-top: 5px;
+    font-weight: 500;
+    opacity: 0.8;
+  }
+  .r-sum-plain {
+    font-size: 10px;
+    color: var(--muted);
+    margin-top: 5px;
+    opacity: 0.75;
   }
 
-  .c-ing-row1 { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-  .c-ing-name {
+  /* ── Servings row ── */
+  .r-servings {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    padding: 14px 18px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+  .r-servings-label {
     flex: 1;
-    padding: 9px 12px;
-    background: #faf7f2;
-    border: 1px solid rgba(180,120,40,0.2);
-    border-radius: 8px;
-    color: #3a2e1e;
-    font-size: 15px;
-    font-family: 'Noto Sans JP', sans-serif;
+    font-size: 14px; font-weight: 500;
+    color: var(--brown2);
+  }
+  .r-stepper {
+    display: flex; align-items: center;
+    border: 1.5px solid var(--border2);
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .r-step-btn {
+    width: 44px; height: 44px;
+    background: var(--amber-dim);
+    border: none; color: var(--amber);
+    font-size: 20px; line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s;
+    display: flex; align-items: center; justify-content: center;
+    font-family: inherit;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .r-step-btn:active { background: rgba(196,124,24,0.22); }
+  .r-step-num {
+    width: 52px; height: 44px;
+    text-align: center;
+    font-size: 18px; font-weight: 700;
+    color: var(--brown);
+    background: var(--surface);
+    border: none;
+    border-left: 1px solid var(--border);
+    border-right: 1px solid var(--border);
     outline: none;
-    transition: border-color 0.15s;
+    font-family: 'DM Sans', sans-serif;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+  .r-servings-unit {
+    font-size: 13px; color: var(--muted); font-weight: 400;
+  }
+
+  /* ── Ingredient cards ── */
+  .r-ing-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 8px; }
+
+  .r-ing-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--amber);
+    border-radius: var(--r);
+    padding: 16px 14px 14px;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s, border-color 0.2s;
+  }
+  .r-ing-card:focus-within {
+    box-shadow: var(--shadow-md);
+    border-color: rgba(160,100,30,0.3);
+    border-left-color: var(--brown2);
+  }
+
+  /* Row 1: 材料名 + 削除 */
+  .r-ing-row1 {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 12px;
+  }
+  .r-ing-name {
+    flex: 1;
+    height: 44px;
+    padding: 0 12px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--brown);
+    font-size: 16px; font-weight: 500;
+    font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
+    outline: none;
+    transition: border-color 0.15s, background 0.15s;
     -webkit-appearance: none;
   }
-  .c-ing-name:focus { border-color: rgba(180,120,40,0.55); background: #fff9ee; }
-  .c-ing-name::placeholder { color: rgba(140,100,40,0.3); }
+  .r-ing-name:focus {
+    border-color: var(--amber);
+    background: #fff;
+  }
+  .r-ing-name::placeholder { color: rgba(140,100,40,0.3); font-weight: 300; }
 
-  .c-ing-row2 {
+  .r-del-btn {
+    width: 36px; height: 36px;
+    background: none;
+    border: 1px solid rgba(180,60,40,0.2);
+    border-radius: 8px;
+    color: rgba(180,60,40,0.4);
+    font-size: 16px; line-height: 1;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s;
+    flex-shrink: 0;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .r-del-btn:active { background: rgba(180,60,40,0.1); color: var(--danger); }
+
+  /* Row 2: 入力グリッド */
+  .r-ing-grid {
     display: grid;
-    grid-template-columns: 2fr 1.2fr 2fr 2fr;
+    grid-template-columns: 1fr 80px 1fr 1fr;
     gap: 8px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
   }
   @media (max-width: 480px) {
-    .c-ing-row2 { grid-template-columns: 1fr 1fr; }
+    .r-ing-grid { grid-template-columns: 1fr 1fr; }
   }
 
-  /* 計算結果グリッド */
-  .c-ing-calc {
-    display: grid;
-    grid-template-columns: repeat(5, 1fr);
-    gap: 6px;
-    padding: 10px 12px;
-    background: #fdf8ee;
-    border-radius: 8px;
-    margin-bottom: 10px;
-    border: 1px solid rgba(180,120,40,0.12);
-  }
-  @media (max-width: 520px) {
-    .c-ing-calc { grid-template-columns: 1fr 1fr; }
-  }
-  .c-calc-item {}
-  .c-calc-label {
-    font-size: 9px;
-    letter-spacing: 0.1em;
-    color: rgba(140,100,40,0.55);
-    font-weight: 600;
-    text-transform: uppercase;
-    margin-bottom: 3px;
-  }
-  .c-calc-value {
-    font-size: 14px;
-    font-weight: 700;
-    color: #7a4e10;
-    line-height: 1.2;
-  }
-  .c-calc-value.accent { color: #2a8a5a; }
-  .c-calc-value.muted  { color: #9e8060; }
-  .c-ing-field label {
+  .r-field {}
+  .r-field-label {
     display: block;
-    font-size: 9px;
-    letter-spacing: 0.12em;
-    color: rgba(140,100,40,0.55);
-    font-weight: 600;
+    font-size: 9px; font-weight: 600;
+    letter-spacing: 0.16em;
+    color: var(--muted);
     text-transform: uppercase;
-    margin-bottom: 4px;
+    margin-bottom: 5px;
+    opacity: 0.75;
   }
-  .c-ing-input {
-    width: 100%;
-    padding: 8px 10px;
-    background: #faf7f2;
-    border: 1px solid rgba(180,120,40,0.2);
-    border-radius: 8px;
-    color: #3a2e1e;
-    font-size: 14px;
-    font-family: 'Noto Sans JP', sans-serif;
+  .r-input {
+    width: 100%; height: 44px;
+    padding: 0 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--brown);
+    font-size: 16px; font-weight: 400;
+    font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
     outline: none;
-    transition: border-color 0.15s;
+    transition: border-color 0.15s, background 0.15s;
     -webkit-appearance: none;
+    appearance: none;
   }
-  .c-ing-input:focus { border-color: rgba(180,120,40,0.55); background: #fff9ee; }
-  .c-ing-input.num { text-align: right; }
-  .c-ing-select {
-    width: 100%;
-    padding: 8px 10px;
-    background: #faf7f2;
-    border: 1px solid rgba(180,120,40,0.2);
-    border-radius: 8px;
-    color: #3a2e1e;
-    font-size: 14px;
-    font-family: 'Noto Sans JP', sans-serif;
+  .r-input.num { text-align: right; }
+  .r-input:focus { border-color: var(--amber); background: #fff; }
+  .r-input::placeholder { color: rgba(140,100,40,0.28); font-weight: 300; }
+
+  .r-select {
+    width: 100%; height: 44px;
+    padding: 0 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--brown);
+    font-size: 16px; font-weight: 400;
+    font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
     outline: none;
     -webkit-appearance: none;
     appearance: none;
     cursor: pointer;
+    text-align: center;
   }
+  .r-select:focus { border-color: var(--amber); }
 
-  .c-ing-row3 { display: flex; flex-direction: column; gap: 8px; }
-  .c-ing-note {
-    width: 100%;
-    padding: 7px 10px;
-    background: #faf7f2;
-    border: 1px solid rgba(180,120,40,0.15);
-    border-radius: 8px;
-    color: #3a2e1e;
-    font-size: 13px;
-    font-family: 'Noto Sans JP', sans-serif;
+  /* ── Calc result box ── */
+  .r-calc-box {
+    background: linear-gradient(135deg, #fdf5e0 0%, #faf0d6 100%);
+    border: 1px solid rgba(196,124,24,0.2);
+    border-radius: var(--r-sm);
+    padding: 12px 14px;
+    margin-bottom: 12px;
+  }
+  .r-calc-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px 16px;
+  }
+  .r-calc-item {}
+  .r-calc-label {
+    font-size: 9px; font-weight: 600;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 3px;
+    opacity: 0.8;
+  }
+  .r-calc-val {
+    font-size: 16px; font-weight: 600;
+    color: var(--brown2);
+    line-height: 1.2;
+  }
+  .r-calc-val.green { color: var(--green); }
+  .r-calc-val.muted { color: var(--muted); font-weight: 400; }
+  .r-calc-val.danger { color: var(--danger); font-weight: 400; }
+
+  /* ── Note + subtotal row ── */
+  .r-ing-foot {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .r-note {
+    flex: 1;
+    height: 40px;
+    padding: 0 10px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--r-sm);
+    color: var(--brown);
+    font-size: 14px; font-weight: 300;
+    font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
     outline: none;
     -webkit-appearance: none;
   }
-  .c-ing-note::placeholder { color: rgba(140,100,40,0.28); font-size: 12px; }
-  .c-ing-subtotal {
-    font-size: 15px;
-    font-weight: 700;
-    color: #9a6010;
-    text-align: right;
-    padding-right: 2px;
+  .r-note::placeholder { color: rgba(140,100,40,0.28); font-size: 13px; }
+  .r-subtotal {
+    font-size: 13px; font-weight: 600;
+    color: var(--amber);
+    white-space: nowrap;
+    letter-spacing: 0.02em;
   }
 
-  .c-btn-del {
-    width: 30px; height: 30px;
-    background: none;
-    border: 1px solid rgba(200,80,60,0.2);
-    border-radius: 8px;
-    color: rgba(200,80,60,0.45);
-    font-size: 15px;
-    cursor: pointer;
-    display: flex; align-items: center; justify-content: center;
-    transition: all 0.15s; flex-shrink: 0;
-  }
-  .c-btn-del:hover { background: rgba(200,80,60,0.1); color: #c04030; border-color: rgba(200,80,60,0.4); }
-
-  .c-total-row {
-    display: flex;
+  /* ── Total row ── */
+  .r-total-row {
+    display: flex; align-items: baseline;
     justify-content: flex-end;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 4px 4px;
+    gap: 10px;
+    padding: 12px 2px 4px;
+    margin-bottom: 12px;
   }
-  .c-total-label { font-size: 11px; letter-spacing: 0.14em; color: rgba(120,80,30,0.6); font-weight: 600; }
-  .c-total-value { font-size: 22px; font-weight: 700; color: #3a2010; }
+  .r-total-label {
+    font-size: 10px; font-weight: 600;
+    letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--muted); opacity: 0.75;
+  }
+  .r-total-value {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 26px; font-weight: 600;
+    color: var(--brown);
+    letter-spacing: -0.01em;
+  }
 
-  .c-btn-add {
-    width: 100%;
-    padding: 13px;
+  /* ── Add button ── */
+  .r-add-btn {
+    width: 100%; height: 48px;
     background: transparent;
-    border: 1px dashed rgba(180,120,40,0.3);
-    border-radius: 12px;
-    color: rgba(140,90,30,0.65);
-    font-size: 13px;
-    letter-spacing: 0.1em;
+    border: 1.5px dashed rgba(160,100,30,0.25);
+    border-radius: var(--r);
+    color: var(--muted);
+    font-size: 13px; font-weight: 500;
+    letter-spacing: 0.08em;
     cursor: pointer;
     transition: all 0.2s;
-    font-family: 'Noto Sans JP', sans-serif;
-    font-weight: 500;
+    font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
     margin-bottom: 28px;
+    -webkit-tap-highlight-color: transparent;
   }
-  .c-btn-add:hover { background: rgba(180,120,40,0.06); color: #a06820; border-color: rgba(180,120,40,0.5); }
+  .r-add-btn:active {
+    background: var(--amber-dim);
+    color: var(--amber);
+    border-color: var(--amber);
+  }
 
-  .c-divider { height: 1px; background: rgba(180,120,40,0.15); margin: 28px 0; }
+  /* ── Divider ── */
+  .r-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 24px 0;
+  }
 
-  .c-recipe {
+  /* ── Recipe textarea ── */
+  .r-recipe {
     width: 100%;
-    min-height: 200px;
-    background: #fff;
-    border: 1px solid rgba(180,120,40,0.18);
-    border-radius: 12px;
-    color: #3a2e1e;
-    padding: 18px;
-    font-size: 14px;
-    font-family: 'Noto Sans JP', sans-serif;
-    font-weight: 300;
-    line-height: 1.9;
-    outline: none;
-    resize: vertical;
-    transition: border-color 0.2s;
-    box-shadow: 0 1px 6px rgba(120,70,10,0.05);
+    min-height: 180px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--r);
+    color: var(--brown);
+    padding: 16px;
+    font-size: 15px; font-weight: 300;
+    font-family: 'DM Sans', 'Noto Sans JP', sans-serif;
+    line-height: 1.85;
+    outline: none; resize: vertical;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    box-shadow: var(--shadow-sm);
+    -webkit-appearance: none;
   }
-  .c-recipe:focus { border-color: rgba(180,120,40,0.45); }
-  .c-recipe::placeholder { color: rgba(140,100,40,0.28); }
+  .r-recipe:focus {
+    border-color: var(--border2);
+    box-shadow: var(--shadow-md);
+  }
+  .r-recipe::placeholder { color: rgba(140,100,40,0.25); }
 
-  .c-loading {
-    text-align: center;
-    padding: 60px 20px;
-    color: rgba(140,100,40,0.55);
-    font-size: 13px;
-    letter-spacing: 0.1em;
+  /* ── Loading ── */
+  .r-loading {
+    display: flex; align-items: center; justify-content: center;
+    flex-direction: column; gap: 14px;
+    padding: 80px 20px;
+    color: var(--muted);
+    font-size: 13px; letter-spacing: 0.1em;
+    opacity: 0.7;
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+  .r-spinner {
+    width: 28px; height: 28px;
+    border: 2px solid var(--border);
+    border-top-color: var(--amber);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
   }
 `;
 
+/* ─────────────────────────────────────────
+   COMPONENT
+───────────────────────────────────────── */
 export default function CurryCalculator() {
   const [ingredients, setIngredients] = useState([defaultIngredient()]);
-  const [servings, setServings] = useState(4);
-  const [recipe, setRecipe] = useState("");
-  const [loading, setLoading] = useState(true);
-  const [saveState, setSaveState] = useState("idle"); // idle | saving | saved | error
-  const [errorMsg, setErrorMsg] = useState("");
+  const [servings, setServings]       = useState(4);
+  const [recipe, setRecipe]           = useState("");
+  const [loading, setLoading]         = useState(true);
+  const [saveState, setSaveState]     = useState("idle");
+  const [errorMsg, setErrorMsg]       = useState("");
 
   useEffect(() => {
     sbLoad().then(d => {
       if (d) {
         if (d.ingredients?.length > 0) setIngredients(d.ingredients);
-        if (d.servings) setServings(d.servings);
-        if (d.recipe !== undefined) setRecipe(d.recipe);
+        if (d.servings)                setServings(d.servings);
+        if (d.recipe !== undefined)    setRecipe(d.recipe);
       }
       setLoading(false);
     });
@@ -483,14 +631,15 @@ export default function CurryCalculator() {
 
   const updateIngredient = (id, field, value) =>
     setIngredients(prev => prev.map(i => i.id === id ? { ...i, [field]: value } : i));
-  const addIngredient = () => setIngredients(prev => [...prev, defaultIngredient()]);
+  const addIngredient    = () => setIngredients(prev => [...prev, defaultIngredient()]);
   const removeIngredient = (id) => setIngredients(prev => prev.filter(i => i.id !== id));
 
-  const getSubtotal = (ing) => calcIngredient(ing).purchaseCost;
-  const totalCost              = ingredients.reduce((s, i) => s + calcIngredient(i).purchaseCost, 0);
-  const totalActual            = ingredients.reduce((s, i) => s + calcIngredient(i).actualCost,   0);
-  const costPerPerson          = servings > 0 ? Math.ceil(totalActual   / servings) : 0;
-  const purchaseCostPerPerson  = servings > 0 ? Math.ceil(totalCost     / servings) : 0;
+  const totalCost             = ingredients.reduce((s, i) => s + calcIngredient(i).purchaseCost, 0);
+  const totalActual           = ingredients.reduce((s, i) => s + calcIngredient(i).actualCost,   0);
+  const totalLoss             = totalCost - totalActual;
+  const costPerPerson         = servings > 0 ? Math.ceil(totalActual / servings)   : 0;
+  const purchaseCostPerPerson = servings > 0 ? Math.ceil(totalCost   / servings)   : 0;
+  const lossPerPerson         = purchaseCostPerPerson - costPerPerson;
 
   const capPerPersonStr = () => {
     const byUnit = {};
@@ -505,187 +654,224 @@ export default function CurryCalculator() {
   };
 
   const saveLabel =
-    saveState === "saving" ? "保存中..." :
+    saveState === "saving" ? "保存中…" :
     saveState === "saved"  ? "✓ 保存済み" :
     saveState === "error"  ? "⚠ エラー" : "保存";
 
   return (
     <>
       <style dangerouslySetInnerHTML={{ __html: styles }} />
-      <div className="curry-app">
 
-        <header className="c-header">
-          <div className="c-header-left">
-            <a href="/" className="c-back">← 案件管理</a>
-            <div>
-              <div className="c-logo">chigu</div>
-              <div className="c-logo-sub">Recipe Studio</div>
+      {/* ── Header ── */}
+      <header className="r-header">
+        <div className="r-header-left">
+          <a href="/" className="r-back">
+            <span className="r-back-arrow">←</span>
+            <span>案件管理</span>
+          </a>
+          <div className="r-logo-wrap">
+            <div className="r-logo">chigu</div>
+            <div className="r-logo-sub">Recipe Studio</div>
+          </div>
+        </div>
+        <div style={{ display:"flex", flexDirection:"column", alignItems:"flex-end", gap:3 }}>
+          <button
+            className={`r-save-btn ${saveState}`}
+            onClick={handleSave}
+            disabled={saveState === "saving" || loading}
+          >{saveLabel}</button>
+          {errorMsg && <div className="r-error-msg">{errorMsg}</div>}
+        </div>
+      </header>
+
+      {/* ── Main ── */}
+      <main className="r-main">
+        {loading ? (
+          <div className="r-loading">
+            <div className="r-spinner" />
+            <span>読み込み中</span>
+          </div>
+        ) : (
+          <>
+            {/* Title */}
+            <div className="r-title-block r-fade">
+              <h1 className="r-title">Curry Recipe</h1>
+              <div className="r-title-sub">Cost Calculator & Recipe Notes</div>
             </div>
-          </div>
-          <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
-            <button
-              className={`btn-save ${saveState}`}
-              onClick={handleSave}
-              disabled={saveState === "saving" || loading}
-            >
-              {saveLabel}
-            </button>
-            {errorMsg && <span style={{fontSize:10,color:"#d04440",maxWidth:180,textAlign:"right",lineHeight:1.3}}>{errorMsg}</span>}
-          </div>
-        </header>
 
-        <main className="c-main">
-          {loading ? (
-            <div className="c-loading">データを読み込み中...</div>
-          ) : (
-            <>
-              <div className="c-page-title">
-                <h1>Curry Recipe</h1>
-                <div className="c-subtitle">COST CALCULATOR & RECIPE NOTES</div>
+            {/* Summary */}
+            <div className="r-summary-grid r-fade r-fade-1">
+              <div className="r-sum-card">
+                <div className="r-sum-label">Total Cost</div>
+                <div className="r-sum-value">
+                  ¥{totalCost.toLocaleString()}
+                  <span className="r-sum-actual">(実 ¥{totalActual.toLocaleString()})</span>
+                </div>
+                {totalLoss > 0
+                  ? <div className="r-sum-sub">(損 ¥{totalLoss.toLocaleString()})</div>
+                  : <div className="r-sum-plain">材料費合計</div>
+                }
               </div>
-
-              {/* Summary */}
-              <div className="c-summary-grid">
-                <div className="c-summary-card">
-                  <div className="sl">Total Cost</div>
-                  <div className="sv">¥{totalCost.toLocaleString()} <span style={{fontSize:16,fontWeight:500,color:"#7a6040"}}>(実 ¥{totalActual.toLocaleString()})</span></div>
-                  <div className="ss">(損 ¥{(totalCost - totalActual).toLocaleString()})</div>
+              <div className="r-sum-card">
+                <div className="r-sum-label">Cost / Person</div>
+                <div className="r-sum-value">
+                  ¥{purchaseCostPerPerson.toLocaleString()}
+                  <span className="r-sum-actual">(実 ¥{costPerPerson.toLocaleString()})</span>
                 </div>
-                <div className="c-summary-card">
-                  <div className="sl">Cost / Person</div>
-                  <div className="sv">¥{purchaseCostPerPerson.toLocaleString()} <span style={{fontSize:16,fontWeight:500,color:"#7a6040"}}>(実 ¥{costPerPerson.toLocaleString()})</span></div>
-                  <div className="ss">(損 ¥{(purchaseCostPerPerson - costPerPerson).toLocaleString()})</div>
-                </div>
-                <div className="c-summary-card">
-                  <div className="sl">Amount / Person</div>
-                  <div className="sv" style={{ fontSize: capPerPersonStr().length > 10 ? 16 : 20 }}>
-                    {capPerPersonStr()}
-                  </div>
-                  <div className="ss">1人あたりの量</div>
-                </div>
+                {lossPerPerson > 0
+                  ? <div className="r-sum-sub">(損 ¥{lossPerPerson.toLocaleString()})</div>
+                  : <div className="r-sum-plain">1人あたり原価</div>
+                }
               </div>
+              <div className="r-sum-card">
+                <div className="r-sum-label">Amount / Person</div>
+                <div className="r-sum-value" style={{ fontSize: capPerPersonStr().length > 9 ? 15 : 20 }}>
+                  {capPerPersonStr()}
+                </div>
+                <div className="r-sum-plain">1人あたりの量</div>
+              </div>
+            </div>
 
-              {/* Servings */}
-              <div className="c-section-label">人数設定</div>
-              <div className="c-servings-row">
-                <span className="c-servings-label">作る人数</span>
-                <div className="c-stepper">
-                  <button className="c-step-btn" onClick={() => setServings(s => Math.max(1, s - 1))}>−</button>
+            {/* Servings */}
+            <div className="r-fade r-fade-2">
+              <div className="r-section" style={{ marginBottom: 12 }}>
+                <span className="r-section-text">人数設定</span>
+                <div className="r-section-line" />
+              </div>
+              <div className="r-servings">
+                <span className="r-servings-label">作る人数</span>
+                <div className="r-stepper">
+                  <button className="r-step-btn" onClick={() => setServings(s => Math.max(1, s - 1))}>−</button>
                   <input
-                    className="c-step-num"
+                    className="r-step-num"
                     type="number" min="1"
                     value={servings}
                     onChange={e => setServings(Math.max(1, parseInt(e.target.value) || 1))}
                   />
-                  <button className="c-step-btn" onClick={() => setServings(s => s + 1)}>＋</button>
+                  <button className="r-step-btn" onClick={() => setServings(s => s + 1)}>＋</button>
                 </div>
-                <span className="c-servings-unit">人分</span>
+                <span className="r-servings-unit">人分</span>
+              </div>
+            </div>
+
+            {/* Ingredients */}
+            <div className="r-fade r-fade-3" style={{ marginTop: 24 }}>
+              <div className="r-section" style={{ marginBottom: 12 }}>
+                <span className="r-section-text">購入材料</span>
+                <div className="r-section-line" />
               </div>
 
-              {/* Ingredients */}
-              <div className="c-section-label" style={{ marginTop: 28 }}>購入材料</div>
+              <div className="r-ing-list">
+                {ingredients.map((ing) => {
+                  const c = calcIngredient(ing);
+                  return (
+                    <div className="r-ing-card" key={ing.id}>
 
-              <div className="c-ing-list">
-                {ingredients.map((ing) => (
-                  <div className="c-ing-card" key={ing.id}>
-                    {/* 材料名 + 削除 */}
-                    <div className="c-ing-row1">
-                      <input
-                        className="c-ing-name"
-                        placeholder="材料名（例：玉ねぎ）"
-                        value={ing.name}
-                        onChange={e => updateIngredient(ing.id, "name", e.target.value)}
-                      />
-                      <button className="c-btn-del" onClick={() => removeIngredient(ing.id)}>×</button>
-                    </div>
+                      {/* 材料名 + 削除 */}
+                      <div className="r-ing-row1">
+                        <input
+                          className="r-ing-name"
+                          placeholder="材料名（例：ココナッツ缶）"
+                          value={ing.name}
+                          onChange={e => updateIngredient(ing.id, "name", e.target.value)}
+                        />
+                        <button className="r-del-btn" onClick={() => removeIngredient(ing.id)}>×</button>
+                      </div>
 
-                    {/* 販売容量 / 単位 / 値段 / 実使用量 */}
-                    <div className="c-ing-row2">
-                      <div className="c-ing-field">
-                        <label>販売容量</label>
-                        <input className="c-ing-input num" type="number" min="0" placeholder="235"
-                          value={ing.capacity} onChange={e => updateIngredient(ing.id, "capacity", e.target.value)} />
+                      {/* 入力グリッド */}
+                      <div className="r-ing-grid">
+                        <div className="r-field">
+                          <label className="r-field-label">販売容量</label>
+                          <input className="r-input num" type="number" min="0" placeholder="235"
+                            value={ing.capacity} onChange={e => updateIngredient(ing.id, "capacity", e.target.value)} />
+                        </div>
+                        <div className="r-field">
+                          <label className="r-field-label">単位</label>
+                          <select className="r-select" value={ing.unit}
+                            onChange={e => updateIngredient(ing.id, "unit", e.target.value)}>
+                            {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                          </select>
+                        </div>
+                        <div className="r-field">
+                          <label className="r-field-label">1個の値段（円）</label>
+                          <input className="r-input num" type="number" min="0" placeholder="200"
+                            value={ing.price} onChange={e => updateIngredient(ing.id, "price", e.target.value)} />
+                        </div>
+                        <div className="r-field">
+                          <label className="r-field-label">実際に使う量</label>
+                          <input className="r-input num" type="number" min="0" placeholder="200"
+                            value={ing.actualUse} onChange={e => updateIngredient(ing.id, "actualUse", e.target.value)} />
+                        </div>
                       </div>
-                      <div className="c-ing-field">
-                        <label>単位</label>
-                        <select className="c-ing-select" value={ing.unit}
-                          onChange={e => updateIngredient(ing.id, "unit", e.target.value)}>
-                          {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
-                        </select>
-                      </div>
-                      <div className="c-ing-field">
-                        <label>1個の値段（円）</label>
-                        <input className="c-ing-input num" type="number" min="0" placeholder="200"
-                          value={ing.price} onChange={e => updateIngredient(ing.id, "price", e.target.value)} />
-                      </div>
-                      <div className="c-ing-field">
-                        <label>実際に使う量</label>
-                        <input className="c-ing-input num" type="number" min="0" placeholder="200"
-                          value={ing.actualUse} onChange={e => updateIngredient(ing.id, "actualUse", e.target.value)} />
-                      </div>
-                    </div>
 
-                    {/* 自動計算結果 */}
-                    {(() => {
-                      const c = calcIngredient(ing);
-                      if (c.needed === 0) return null;
-                      return (
-                        <div className="c-ing-calc">
-                          <div className="c-calc-item">
-                            <div className="c-calc-label">必要購入数</div>
-                            <div className="c-calc-value accent">{c.needed} 個</div>
-                          </div>
-                          <div className="c-calc-item">
-                            <div className="c-calc-label">購入原価</div>
-                            <div className="c-calc-value">¥{c.purchaseCost.toLocaleString()}</div>
-                          </div>
-                          <div className="c-calc-item">
-                            <div className="c-calc-label">実原価</div>
-                            <div className="c-calc-value accent">¥{c.actualCost.toLocaleString()}</div>
-                          </div>
-                          <div className="c-calc-item">
-                            <div className="c-calc-label">余り量</div>
-                            <div className="c-calc-value muted">{c.leftover}{ing.unit}</div>
-                          </div>
-                          <div className="c-calc-item">
-                            <div className="c-calc-label">余り原価</div>
-                            <div className="c-calc-value muted">¥{c.leftoverCost.toLocaleString()}</div>
+                      {/* 計算結果 */}
+                      {c.needed > 0 && (
+                        <div className="r-calc-box">
+                          <div className="r-calc-grid">
+                            <div className="r-calc-item">
+                              <div className="r-calc-label">必要購入数</div>
+                              <div className="r-calc-val green">{c.needed} 個</div>
+                            </div>
+                            <div className="r-calc-item">
+                              <div className="r-calc-label">購入原価</div>
+                              <div className="r-calc-val">¥{c.purchaseCost.toLocaleString()}</div>
+                            </div>
+                            <div className="r-calc-item">
+                              <div className="r-calc-label">実原価</div>
+                              <div className="r-calc-val green">¥{c.actualCost.toLocaleString()}</div>
+                            </div>
+                            <div className="r-calc-item">
+                              <div className="r-calc-label">余り量 / 余り原価</div>
+                              <div className="r-calc-val muted">
+                                {c.leftover}{ing.unit}
+                                <span className="r-calc-val danger" style={{marginLeft:6,fontSize:13}}>
+                                  ¥{c.leftoverCost.toLocaleString()}
+                                </span>
+                              </div>
+                            </div>
                           </div>
                         </div>
-                      );
-                    })()}
+                      )}
 
-                    {/* 備考 + 小計 */}
-                    <div className="c-ing-row3">
-                      <input className="c-ing-note" placeholder="備考（産地・ブランドなど）"
-                        value={ing.note} onChange={e => updateIngredient(ing.id, "note", e.target.value)} />
-                      <div className="c-ing-subtotal">購入原価：¥{getSubtotal(ing).toLocaleString()}</div>
+                      {/* 備考 + 小計 */}
+                      <div className="r-ing-foot">
+                        <input className="r-note" placeholder="備考（産地・ブランドなど）"
+                          value={ing.note} onChange={e => updateIngredient(ing.id, "note", e.target.value)} />
+                        {c.needed > 0 &&
+                          <div className="r-subtotal">¥{c.purchaseCost.toLocaleString()}</div>
+                        }
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
 
-              <div className="c-total-row">
-                <span className="c-total-label">合計</span>
-                <span className="c-total-value">¥{totalCost.toLocaleString()}</span>
+              {/* 合計 */}
+              <div className="r-total-row">
+                <span className="r-total-label">Total</span>
+                <span className="r-total-value">¥{totalCost.toLocaleString()}</span>
               </div>
 
-              <button className="c-btn-add" onClick={addIngredient}>＋ 材料を追加</button>
+              <button className="r-add-btn" onClick={addIngredient}>＋ 材料を追加</button>
+            </div>
 
-              <div className="c-divider" />
-
-              {/* Recipe */}
-              <div className="c-section-label">レシピ手順</div>
+            {/* Recipe */}
+            <div className="r-fade r-fade-4">
+              <div className="r-divider" />
+              <div className="r-section" style={{ marginBottom: 12 }}>
+                <span className="r-section-text">レシピ手順</span>
+                <div className="r-section-line" />
+              </div>
               <textarea
-                className="c-recipe"
+                className="r-recipe"
                 placeholder="レシピの手順、コツ、メモなどを自由に記入..."
                 value={recipe}
                 onChange={e => setRecipe(e.target.value)}
               />
-            </>
-          )}
-        </main>
-      </div>
+            </div>
+          </>
+        )}
+      </main>
     </>
   );
 }
