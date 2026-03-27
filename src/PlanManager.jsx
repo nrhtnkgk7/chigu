@@ -469,46 +469,48 @@ const styles = {
 };
 
 // ── Item Card Component ──
-function ItemCard({ item, onTap, readonly, onTimeChange, onDragStart, onDragOver, onDragEnd, onTouchStart, onTouchMove, onTouchEnd, isDragging }) {
+function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange, onMoveUp, onMoveDown, showMoveUp, showMoveDown }) {
   const [editingTime, setEditingTime] = useState(false);
+  const [editingDate, setEditingDate] = useState(false);
   const [tempTime, setTempTime] = useState(item.time || '');
-  const sc = STATUS_CONFIG[item.status] || STATUS_CONFIG['未定'];
+  const [tempDate, setTempDate] = useState(item.date || '');
 
   function handleTimeSubmit() {
     if (onTimeChange) onTimeChange(item.id, tempTime || null);
     setEditingTime(false);
   }
+  function handleDateSubmit() {
+    if (onDateChange) onDateChange(item.id, tempDate || null);
+    setEditingDate(false);
+  }
+
+  const arrowBtn = {
+    border: 'none', background: 'none', padding: '4px 6px',
+    fontSize: 14, color: C.textLight, cursor: 'pointer',
+    lineHeight: 1, borderRadius: 4,
+  };
 
   return (
-    <div
-      style={{
-        ...styles.itemCard,
-        opacity: isDragging ? 0.5 : 1,
-        transform: isDragging ? 'scale(1.02)' : 'none',
-        boxShadow: isDragging ? '0 4px 16px rgba(0,0,0,0.15)' : 'none',
-        transition: isDragging ? 'none' : 'all 0.15s ease',
-      }}
-      draggable={!readonly}
-      onDragStart={onDragStart}
-      onDragOver={onDragOver}
-      onDragEnd={onDragEnd}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-    >
-      {/* Drag Handle */}
+    <div style={styles.itemCard}>
+      {/* Move Arrows */}
       {!readonly && (
         <div style={{
-          display: 'flex', alignItems: 'center', padding: '0 4px 0 0',
-          color: C.textLight, fontSize: 16, cursor: 'grab', touchAction: 'none',
-          userSelect: 'none', flexShrink: 0,
+          display: 'flex', flexDirection: 'column', justifyContent: 'center',
+          flexShrink: 0, marginRight: 2,
         }}>
-          ⠿
+          <button
+            style={{ ...arrowBtn, visibility: showMoveUp ? 'visible' : 'hidden' }}
+            onClick={e => { e.stopPropagation(); onMoveUp && onMoveUp(item.id); }}
+          >▲</button>
+          <button
+            style={{ ...arrowBtn, visibility: showMoveDown ? 'visible' : 'hidden' }}
+            onClick={e => { e.stopPropagation(); onMoveDown && onMoveDown(item.id); }}
+          >▼</button>
         </div>
       )}
 
       {/* Time - tap to edit */}
-      <div style={{ ...styles.itemTime, cursor: readonly ? 'default' : 'pointer', position: 'relative' }}>
+      <div style={{ ...styles.itemTime, cursor: readonly ? 'default' : 'pointer' }}>
         {editingTime && !readonly ? (
           <input
             type="time"
@@ -518,8 +520,8 @@ function ItemCard({ item, onTap, readonly, onTimeChange, onDragStart, onDragOver
             onKeyDown={e => e.key === 'Enter' && handleTimeSubmit()}
             autoFocus
             style={{
-              width: 60, border: `1px solid ${C.accent}`, borderRadius: 6,
-              padding: '2px 4px', fontSize: 13, fontFamily: '"Noto Sans JP", sans-serif',
+              width: 64, border: `1px solid ${C.accent}`, borderRadius: 6,
+              padding: '4px 6px', fontSize: 14, fontFamily: '"Noto Sans JP", sans-serif',
               color: C.primary, background: C.white, outline: 'none',
             }}
             onClick={e => e.stopPropagation()}
@@ -533,7 +535,7 @@ function ItemCard({ item, onTap, readonly, onTimeChange, onDragStart, onDragOver
               setEditingTime(true);
             }}
             style={{
-              padding: '2px 4px', borderRadius: 6,
+              padding: '4px 6px', borderRadius: 6,
               background: !readonly ? C.primaryBg : 'transparent',
             }}
           >
@@ -566,6 +568,54 @@ function ItemCard({ item, onTap, readonly, onTimeChange, onDragStart, onDragOver
         {item.genre && <div style={styles.itemSub}>{item.genre}</div>}
         {item.address && <div style={styles.itemSub}>{item.address}</div>}
         {item.memo && <div style={{ ...styles.itemSub, fontStyle: 'italic' }}>{item.memo}</div>}
+
+        {/* Inline date setter for undecided items */}
+        {!item.date && !readonly && (
+          <div style={{ marginTop: 6 }}>
+            {editingDate ? (
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                <input
+                  type="date"
+                  value={tempDate}
+                  onChange={e => setTempDate(e.target.value)}
+                  style={{
+                    border: `1px solid ${C.accent}`, borderRadius: 6,
+                    padding: '4px 8px', fontSize: 14, fontFamily: '"Noto Sans JP", sans-serif',
+                    color: C.primary, background: C.white, outline: 'none',
+                  }}
+                  autoFocus
+                />
+                <button
+                  onClick={handleDateSubmit}
+                  style={{
+                    border: 'none', background: C.primary, color: C.white,
+                    borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer',
+                    fontFamily: '"Noto Sans JP", sans-serif',
+                  }}
+                >決定</button>
+                <button
+                  onClick={() => setEditingDate(false)}
+                  style={{
+                    border: `1px solid ${C.border}`, background: C.white, color: C.textSub,
+                    borderRadius: 6, padding: '4px 8px', fontSize: 12, cursor: 'pointer',
+                    fontFamily: '"Noto Sans JP", sans-serif',
+                  }}
+                >×</button>
+              </div>
+            ) : (
+              <span
+                onClick={e => { e.stopPropagation(); setTempDate(''); setEditingDate(true); }}
+                style={{
+                  fontSize: 12, color: C.accent, cursor: 'pointer',
+                  padding: '2px 8px', borderRadius: 6, background: C.maybeBg,
+                  fontWeight: 600,
+                }}
+              >
+                + 日付を設定
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
       {!readonly && <span style={styles.chevron} onClick={() => onTap && onTap(item)}>›</span>}
@@ -599,92 +649,44 @@ export default function PlanManager() {
 
   const exportRef = useRef(null);
 
-  // Drag and drop state
-  const [dragId, setDragId] = useState(null);
-  const [dragOverId, setDragOverId] = useState(null);
-  const touchState = useRef({ id: null, startY: 0, el: null, clone: null, moved: false, timer: null });
-
   function handleTimeChange(id, time) {
     updateItem(id, { time });
   }
 
-  // Desktop drag handlers
-  function handleDragStart(e, item) {
-    setDragId(item.id);
-    e.dataTransfer.effectAllowed = 'move';
-  }
-  function handleDragOver(e, item) {
-    e.preventDefault();
-    if (item.id !== dragOverId) setDragOverId(item.id);
-  }
-  async function handleDragEnd() {
-    if (dragId && dragOverId && dragId !== dragOverId) {
-      await reorderItems(dragId, dragOverId);
-    }
-    setDragId(null);
-    setDragOverId(null);
+  function handleDateChange(id, date) {
+    updateItem(id, { date });
   }
 
-  // Touch drag handlers (long press)
-  function handleTouchStart(e, item) {
-    const touch = e.touches[0];
-    touchState.current.startY = touch.clientY;
-    touchState.current.id = item.id;
-    touchState.current.moved = false;
-    touchState.current.timer = setTimeout(() => {
-      setDragId(item.id);
-      touchState.current.moved = true;
-      if (navigator.vibrate) navigator.vibrate(30);
-    }, 400);
-  }
-  function handleTouchMove(e) {
-    if (!touchState.current.moved) {
-      const dy = Math.abs(e.touches[0].clientY - touchState.current.startY);
-      if (dy > 10 && !dragId) {
-        clearTimeout(touchState.current.timer);
-        return;
-      }
+  async function moveItem(id, direction) {
+    // Get the flat ordered list of all items
+    const allOrdered = [];
+    const { groups, sortedDates, undecided } = groupByDate(items);
+    for (const date of sortedDates) {
+      for (const it of groups[date]) allOrdered.push(it);
     }
-    if (!dragId) return;
-    e.preventDefault();
-    const touch = e.touches[0];
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (el) {
-      const card = el.closest('[data-item-id]');
-      if (card) {
-        const overId = card.getAttribute('data-item-id');
-        if (overId !== dragOverId) setDragOverId(overId);
-      }
-    }
-  }
-  async function handleTouchEnd() {
-    clearTimeout(touchState.current.timer);
-    if (dragId && dragOverId && dragId !== dragOverId) {
-      await reorderItems(dragId, dragOverId);
-    }
-    setDragId(null);
-    setDragOverId(null);
-    touchState.current = { id: null, startY: 0, el: null, clone: null, moved: false, timer: null };
-  }
+    for (const it of undecided) allOrdered.push(it);
 
-  async function reorderItems(fromId, toId) {
-    const newItems = [...items];
-    const fromIdx = newItems.findIndex(i => i.id === fromId);
-    const toIdx = newItems.findIndex(i => i.id === toId);
-    if (fromIdx === -1 || toIdx === -1) return;
-    // Also swap dates so item moves into the target's date group
-    const fromDate = newItems[fromIdx].date;
-    const toDate = newItems[toIdx].date;
-    const [moved] = newItems.splice(fromIdx, 1);
-    moved.date = toDate;
-    newItems.splice(toIdx, 0, moved);
-    // Update sort_order for all
-    const updates = newItems.map((it, i) => ({ ...it, sort_order: i }));
+    const idx = allOrdered.findIndex(i => i.id === id);
+    if (idx === -1) return;
+    const swapIdx = idx + direction;
+    if (swapIdx < 0 || swapIdx >= allOrdered.length) return;
+
+    // Swap sort_order values
+    const a = allOrdered[idx];
+    const b = allOrdered[swapIdx];
+    // Also swap dates so items move between date groups
+    const newDateA = b.date;
+    const newDateB = a.date;
+
+    const updates = items.map(it => {
+      if (it.id === a.id) return { ...it, sort_order: b.sort_order, date: newDateA };
+      if (it.id === b.id) return { ...it, sort_order: a.sort_order, date: newDateB };
+      return it;
+    });
     setItems(updates);
-    // Persist
-    for (const it of updates) {
-      await supabase.from('plan_items').update({ sort_order: it.sort_order, date: it.date }).eq('id', it.id);
-    }
+
+    await supabase.from('plan_items').update({ sort_order: b.sort_order, date: newDateA }).eq('id', a.id);
+    await supabase.from('plan_items').update({ sort_order: a.sort_order, date: newDateB }).eq('id', b.id);
   }
 
   // ── Shared View ──
@@ -1131,61 +1133,70 @@ export default function PlanManager() {
           </div>
         )}
 
-        {sortedDates.map(date => (
-          <div key={date}>
-            <div style={styles.dateHeader}>
-              <span>{formatDate(date)}</span>
-              <span style={{ fontSize: 12, fontWeight: 400, color: C.textSub }}>
-                {groups[date].length}件
-              </span>
-            </div>
-            {groups[date].map(item => (
-              <div key={item.id} data-item-id={item.id} style={{
-                borderTop: dragOverId === item.id ? `2px solid ${C.accent}` : '2px solid transparent',
-              }}>
-                <ItemCard
-                  item={item}
-                  onTap={openEdit}
-                  onTimeChange={handleTimeChange}
-                  isDragging={dragId === item.id}
-                  onDragStart={e => handleDragStart(e, item)}
-                  onDragOver={e => handleDragOver(e, item)}
-                  onDragEnd={handleDragEnd}
-                  onTouchStart={e => handleTouchStart(e, item)}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                />
-              </div>
-            ))}
-          </div>
-        ))}
+        {(() => {
+          // Build flat ordered list for move up/down boundary checks
+          const allOrdered = [];
+          for (const date of sortedDates) {
+            for (const it of groups[date]) allOrdered.push(it);
+          }
+          for (const it of undecided) allOrdered.push(it);
 
-        {undecided.length > 0 && (
-          <div>
-            <div style={{ ...styles.dateHeader, color: C.undecided, borderColor: C.undecided }}>
-              <span>📌 日程未定</span>
-              <span style={{ fontSize: 12, fontWeight: 400 }}>{undecided.length}件</span>
-            </div>
-            {undecided.map(item => (
-              <div key={item.id} data-item-id={item.id} style={{
-                borderTop: dragOverId === item.id ? `2px solid ${C.accent}` : '2px solid transparent',
-              }}>
-                <ItemCard
-                  item={item}
-                  onTap={openEdit}
-                  onTimeChange={handleTimeChange}
-                  isDragging={dragId === item.id}
-                  onDragStart={e => handleDragStart(e, item)}
-                  onDragOver={e => handleDragOver(e, item)}
-                  onDragEnd={handleDragEnd}
-                  onTouchStart={e => handleTouchStart(e, item)}
-                  onTouchMove={handleTouchMove}
-                  onTouchEnd={handleTouchEnd}
-                />
-              </div>
-            ))}
-          </div>
-        )}
+          return (
+            <>
+              {sortedDates.map(date => (
+                <div key={date}>
+                  <div style={styles.dateHeader}>
+                    <span>{formatDate(date)}</span>
+                    <span style={{ fontSize: 12, fontWeight: 400, color: C.textSub }}>
+                      {groups[date].length}件
+                    </span>
+                  </div>
+                  {groups[date].map(item => {
+                    const flatIdx = allOrdered.findIndex(i => i.id === item.id);
+                    return (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        onTap={openEdit}
+                        onTimeChange={handleTimeChange}
+                        onDateChange={handleDateChange}
+                        onMoveUp={id => moveItem(id, -1)}
+                        onMoveDown={id => moveItem(id, 1)}
+                        showMoveUp={flatIdx > 0}
+                        showMoveDown={flatIdx < allOrdered.length - 1}
+                      />
+                    );
+                  })}
+                </div>
+              ))}
+
+              {undecided.length > 0 && (
+                <div>
+                  <div style={{ ...styles.dateHeader, color: C.undecided, borderColor: C.undecided }}>
+                    <span>📌 日程未定</span>
+                    <span style={{ fontSize: 12, fontWeight: 400 }}>{undecided.length}件</span>
+                  </div>
+                  {undecided.map(item => {
+                    const flatIdx = allOrdered.findIndex(i => i.id === item.id);
+                    return (
+                      <ItemCard
+                        key={item.id}
+                        item={item}
+                        onTap={openEdit}
+                        onTimeChange={handleTimeChange}
+                        onDateChange={handleDateChange}
+                        onMoveUp={id => moveItem(id, -1)}
+                        onMoveDown={id => moveItem(id, 1)}
+                        showMoveUp={flatIdx > 0}
+                        showMoveDown={flatIdx < allOrdered.length - 1}
+                      />
+                    );
+                  })}
+                </div>
+              )}
+            </>
+          );
+        })()}
       </div>
 
       {/* Floating Add Button */}
