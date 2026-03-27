@@ -119,14 +119,11 @@ function groupByDate(items) {
     }
   }
   const sortedDates = Object.keys(groups).sort();
+  // sort_order優先（手動並び替え対応）
   sortedDates.forEach(date => {
-    groups[date].sort((a, b) => {
-      if (!a.time && !b.time) return 0;
-      if (!a.time) return 1;
-      if (!b.time) return -1;
-      return a.time.localeCompare(b.time);
-    });
+    groups[date].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   });
+  undecided.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   return { groups, sortedDates, undecided };
 }
 
