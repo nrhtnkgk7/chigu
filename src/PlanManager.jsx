@@ -468,8 +468,8 @@ const styles = {
   },
 };
 
-// ── Item Card Component ──
-function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange, onMoveUp, onMoveDown, showMoveUp, showMoveDown }) {
+// ── Item Card Component (pure display) ──
+function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange }) {
   const [editingTime, setEditingTime] = useState(false);
   const [editingDate, setEditingDate] = useState(false);
   const [tempTime, setTempTime] = useState(item.time || '');
@@ -484,28 +484,19 @@ function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange, onMoveUp,
     setEditingDate(false);
   }
 
-  const arrowBtn = {
-    border: 'none', background: 'none', padding: '4px 6px',
-    fontSize: 14, color: C.textLight, cursor: 'pointer',
-    lineHeight: 1, borderRadius: 4,
-  };
-
   return (
-    <div style={styles.itemCard}>
-      {/* Move Arrows */}
+    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
+      {/* Drag Handle - visual only, events handled by parent */}
       {!readonly && (
-        <div style={{
-          display: 'flex', flexDirection: 'column', justifyContent: 'center',
-          flexShrink: 0, marginRight: 2,
-        }}>
-          <button
-            style={{ ...arrowBtn, visibility: showMoveUp ? 'visible' : 'hidden' }}
-            onClick={e => { e.stopPropagation(); onMoveUp && onMoveUp(item.id); }}
-          >▲</button>
-          <button
-            style={{ ...arrowBtn, visibility: showMoveDown ? 'visible' : 'hidden' }}
-            onClick={e => { e.stopPropagation(); onMoveDown && onMoveDown(item.id); }}
-          >▼</button>
+        <div
+          className="drag-handle"
+          style={{
+            display: 'flex', alignItems: 'center', padding: '8px 2px',
+            color: C.textLight, fontSize: 18, cursor: 'grab', touchAction: 'none',
+            userSelect: 'none', flexShrink: 0, lineHeight: 1,
+          }}
+        >
+          ≡
         </div>
       )}
 
@@ -521,7 +512,7 @@ function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange, onMoveUp,
             autoFocus
             style={{
               width: 64, border: `1px solid ${C.accent}`, borderRadius: 6,
-              padding: '4px 6px', fontSize: 14, fontFamily: '"Noto Sans JP", sans-serif',
+              padding: '4px 6px', fontSize: 16, fontFamily: '"Noto Sans JP", sans-serif',
               color: C.primary, background: C.white, outline: 'none',
             }}
             onClick={e => e.stopPropagation()}
@@ -549,19 +540,9 @@ function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange, onMoveUp,
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
           <span style={styles.itemName}>{item.name}</span>
           {item.url && (
-            <a
-              href={item.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{
-                fontSize: 16, textDecoration: 'none', flexShrink: 0,
-                display: 'inline-flex', alignItems: 'center',
-              }}
-              onClick={e => e.stopPropagation()}
-              title="地図を開く"
-            >
-              📍
-            </a>
+            <a href={item.url} target="_blank" rel="noopener noreferrer"
+              style={{ fontSize: 16, textDecoration: 'none', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}
+              onClick={e => e.stopPropagation()} title="地図を開く">📍</a>
           )}
           <span style={styles.statusBadge(item.status)}>{item.status}</span>
         </div>
@@ -569,56 +550,148 @@ function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange, onMoveUp,
         {item.address && <div style={styles.itemSub}>{item.address}</div>}
         {item.memo && <div style={{ ...styles.itemSub, fontStyle: 'italic' }}>{item.memo}</div>}
 
-        {/* Inline date setter for undecided items */}
+        {/* Inline date for undecided */}
         {!item.date && !readonly && (
           <div style={{ marginTop: 6 }}>
             {editingDate ? (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                <input
-                  type="date"
-                  value={tempDate}
-                  onChange={e => setTempDate(e.target.value)}
-                  style={{
-                    border: `1px solid ${C.accent}`, borderRadius: 6,
-                    padding: '4px 8px', fontSize: 14, fontFamily: '"Noto Sans JP", sans-serif',
-                    color: C.primary, background: C.white, outline: 'none',
-                  }}
-                  autoFocus
-                />
-                <button
-                  onClick={handleDateSubmit}
-                  style={{
-                    border: 'none', background: C.primary, color: C.white,
-                    borderRadius: 6, padding: '4px 10px', fontSize: 12, cursor: 'pointer',
-                    fontFamily: '"Noto Sans JP", sans-serif',
-                  }}
-                >決定</button>
-                <button
-                  onClick={() => setEditingDate(false)}
-                  style={{
-                    border: `1px solid ${C.border}`, background: C.white, color: C.textSub,
-                    borderRadius: 6, padding: '4px 8px', fontSize: 12, cursor: 'pointer',
-                    fontFamily: '"Noto Sans JP", sans-serif',
-                  }}
-                >×</button>
+                <input type="date" value={tempDate} onChange={e => setTempDate(e.target.value)} autoFocus
+                  style={{ border: `1px solid ${C.accent}`, borderRadius: 6, padding: '4px 8px', fontSize: 16,
+                    fontFamily: '"Noto Sans JP", sans-serif', color: C.primary, background: C.white, outline: 'none' }} />
+                <button onClick={handleDateSubmit}
+                  style={{ border: 'none', background: C.primary, color: C.white, borderRadius: 6,
+                    padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontFamily: '"Noto Sans JP", sans-serif' }}>決定</button>
+                <button onClick={() => setEditingDate(false)}
+                  style={{ border: `1px solid ${C.border}`, background: C.white, color: C.textSub, borderRadius: 6,
+                    padding: '4px 8px', fontSize: 12, cursor: 'pointer', fontFamily: '"Noto Sans JP", sans-serif' }}>×</button>
               </div>
             ) : (
-              <span
-                onClick={e => { e.stopPropagation(); setTempDate(''); setEditingDate(true); }}
-                style={{
-                  fontSize: 12, color: C.accent, cursor: 'pointer',
-                  padding: '2px 8px', borderRadius: 6, background: C.maybeBg,
-                  fontWeight: 600,
-                }}
-              >
-                + 日付を設定
-              </span>
+              <span onClick={e => { e.stopPropagation(); setTempDate(''); setEditingDate(true); }}
+                style={{ fontSize: 12, color: C.accent, cursor: 'pointer', padding: '2px 8px', borderRadius: 6,
+                  background: C.maybeBg, fontWeight: 600 }}>+ 日付を設定</span>
             )}
           </div>
         )}
       </div>
 
       {!readonly && <span style={styles.chevron} onClick={() => onTap && onTap(item)}>›</span>}
+    </div>
+  );
+}
+
+// ── Sortable List with Touch Drag ──
+function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHeader }) {
+  const [dragIdx, setDragIdx] = useState(null);
+  const [overIdx, setOverIdx] = useState(null);
+  const containerRef = useRef(null);
+  const dragState = useRef({ active: false, timer: null, startY: 0, scrollInterval: null });
+
+  function findItemIndex(el) {
+    const row = el.closest('[data-sort-idx]');
+    return row ? parseInt(row.getAttribute('data-sort-idx')) : null;
+  }
+
+  // Auto-scroll near edges
+  function startAutoScroll(clientY) {
+    stopAutoScroll();
+    const edge = 80;
+    const speed = 8;
+    dragState.current.scrollInterval = setInterval(() => {
+      if (clientY < edge) window.scrollBy(0, -speed);
+      else if (clientY > window.innerHeight - edge) window.scrollBy(0, speed);
+    }, 16);
+  }
+  function stopAutoScroll() {
+    if (dragState.current.scrollInterval) {
+      clearInterval(dragState.current.scrollInterval);
+      dragState.current.scrollInterval = null;
+    }
+  }
+
+  function cleanup() {
+    clearTimeout(dragState.current.timer);
+    stopAutoScroll();
+    document.body.style.overflow = '';
+    dragState.current.active = false;
+    setDragIdx(null);
+    setOverIdx(null);
+  }
+
+  // ── Touch Events (handle on ≡ only) ──
+  function onTouchStart(e) {
+    const handle = e.target.closest('.drag-handle');
+    if (!handle) return;
+    const idx = findItemIndex(e.target);
+    if (idx === null) return;
+
+    const touch = e.touches[0];
+    dragState.current.startY = touch.clientY;
+    dragState.current.timer = setTimeout(() => {
+      dragState.current.active = true;
+      setDragIdx(idx);
+      setOverIdx(idx);
+      if (navigator.vibrate) navigator.vibrate(20);
+      document.body.style.overflow = 'hidden';
+    }, 200);
+  }
+
+  function onTouchMove(e) {
+    if (!dragState.current.active) {
+      const dy = Math.abs(e.touches[0].clientY - dragState.current.startY);
+      if (dy > 8) clearTimeout(dragState.current.timer);
+      return;
+    }
+    e.preventDefault();
+    const touch = e.touches[0];
+    startAutoScroll(touch.clientY);
+    const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (el) {
+      const idx = findItemIndex(el);
+      if (idx !== null) setOverIdx(idx);
+    }
+  }
+
+  function onTouchEnd() {
+    if (dragState.current.active && dragIdx !== null && overIdx !== null && dragIdx !== overIdx) {
+      onReorder(dragIdx, overIdx);
+    }
+    cleanup();
+  }
+
+  return (
+    <div
+      ref={containerRef}
+      onTouchStart={onTouchStart}
+      onTouchMove={onTouchMove}
+      onTouchEnd={onTouchEnd}
+      onTouchCancel={cleanup}
+    >
+      {flatItems.map((item, idx) => {
+        const isDragging = dragIdx === idx;
+        const isOver = overIdx === idx && dragIdx !== null && dragIdx !== overIdx;
+        const dropAbove = isOver && dragIdx > overIdx;
+        const dropBelow = isOver && dragIdx < overIdx;
+
+        return (
+          <div key={item.id}>
+            {renderSectionHeader && renderSectionHeader(item, idx, flatItems)}
+            <div
+              data-sort-idx={idx}
+              style={{
+                ...styles.itemCard,
+                opacity: isDragging ? 0.35 : 1,
+                background: isDragging ? C.primaryBg : C.card,
+                borderTop: dropAbove ? `3px solid ${C.accent}` : undefined,
+                borderBottom: dropBelow ? `3px solid ${C.accent}` : undefined,
+                transform: isDragging ? 'scale(0.97)' : 'none',
+                transition: 'all 0.12s ease',
+              }}
+            >
+              {renderItem(item, idx)}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -657,36 +730,37 @@ export default function PlanManager() {
     updateItem(id, { date });
   }
 
-  async function moveItem(id, direction) {
-    // Get the flat ordered list of all items
-    const allOrdered = [];
-    const { groups, sortedDates, undecided } = groupByDate(items);
-    for (const date of sortedDates) {
-      for (const it of groups[date]) allOrdered.push(it);
+  // Build flat ordered list from grouped data
+  function buildFlatList() {
+    const flat = [];
+    const { groups: g, sortedDates: sd, undecided: u } = groupByDate(
+      statusFilter === 'all' ? items : items.filter(it => it.status === statusFilter)
+    );
+    for (const d of sd) for (const it of g[d]) flat.push(it);
+    for (const it of u) flat.push(it);
+    return flat;
+  }
+
+  async function handleReorder(fromIdx, toIdx) {
+    const flat = buildFlatList();
+    const arr = [...flat];
+    const [moved] = arr.splice(fromIdx, 1);
+    arr.splice(toIdx, 0, moved);
+
+    // Update sort_order for all reordered items
+    const updates = arr.map((it, i) => ({ ...it, sort_order: i }));
+    // Merge back with any filtered-out items
+    const updatedIds = new Set(updates.map(u => u.id));
+    const newItems = [
+      ...updates,
+      ...items.filter(it => !updatedIds.has(it.id)),
+    ];
+    setItems(newItems);
+
+    // Persist
+    for (const it of updates) {
+      await supabase.from('plan_items').update({ sort_order: it.sort_order }).eq('id', it.id);
     }
-    for (const it of undecided) allOrdered.push(it);
-
-    const idx = allOrdered.findIndex(i => i.id === id);
-    if (idx === -1) return;
-    const swapIdx = idx + direction;
-    if (swapIdx < 0 || swapIdx >= allOrdered.length) return;
-
-    // Swap sort_order values
-    const a = allOrdered[idx];
-    const b = allOrdered[swapIdx];
-    // Also swap dates so items move between date groups
-    const newDateA = b.date;
-    const newDateB = a.date;
-
-    const updates = items.map(it => {
-      if (it.id === a.id) return { ...it, sort_order: b.sort_order, date: newDateA };
-      if (it.id === b.id) return { ...it, sort_order: a.sort_order, date: newDateB };
-      return it;
-    });
-    setItems(updates);
-
-    await supabase.from('plan_items').update({ sort_order: b.sort_order, date: newDateA }).eq('id', a.id);
-    await supabase.from('plan_items').update({ sort_order: a.sort_order, date: newDateB }).eq('id', b.id);
   }
 
   // ── Shared View ──
@@ -1134,66 +1208,65 @@ export default function PlanManager() {
         )}
 
         {(() => {
-          // Build flat ordered list for move up/down boundary checks
-          const allOrdered = [];
-          for (const date of sortedDates) {
-            for (const it of groups[date]) allOrdered.push(it);
+          const flat = buildFlatList();
+          if (flat.length === 0) return null;
+
+          // Insert date headers as section markers
+          let lastDate = null;
+          const sections = [];
+          for (let i = 0; i < flat.length; i++) {
+            const item = flat[i];
+            const dateKey = item.date || '__undecided__';
+            if (dateKey !== lastDate) {
+              const isUndecided = !item.date;
+              sections.push(
+                <div key={`header-${dateKey}`} style={{
+                  ...styles.dateHeader,
+                  color: isUndecided ? C.undecided : C.primary,
+                  borderColor: isUndecided ? C.undecided : C.primary,
+                }}>
+                  <span>{isUndecided ? '📌 日程未定' : formatDate(item.date)}</span>
+                  <span style={{ fontSize: 12, fontWeight: 400, color: C.textSub }}>
+                    {flat.filter(x => (x.date || '__undecided__') === dateKey).length}件
+                  </span>
+                </div>
+              );
+              lastDate = dateKey;
+            }
           }
-          for (const it of undecided) allOrdered.push(it);
 
           return (
             <>
-              {sortedDates.map(date => (
-                <div key={date}>
-                  <div style={styles.dateHeader}>
-                    <span>{formatDate(date)}</span>
-                    <span style={{ fontSize: 12, fontWeight: 400, color: C.textSub }}>
-                      {groups[date].length}件
-                    </span>
-                  </div>
-                  {groups[date].map(item => {
-                    const flatIdx = allOrdered.findIndex(i => i.id === item.id);
+              <SortableList
+                items={flat}
+                onReorder={handleReorder}
+                renderItem={(item) => (
+                  <ItemCard
+                    item={item}
+                    onTap={openEdit}
+                    onTimeChange={handleTimeChange}
+                    onDateChange={handleDateChange}
+                  />
+                )}
+                renderSectionHeader={(item, idx, allItems) => {
+                  if (idx === 0 || (allItems[idx - 1].date || null) !== (item.date || null)) {
+                    const isUndecided = !item.date;
                     return (
-                      <ItemCard
-                        key={item.id}
-                        item={item}
-                        onTap={openEdit}
-                        onTimeChange={handleTimeChange}
-                        onDateChange={handleDateChange}
-                        onMoveUp={id => moveItem(id, -1)}
-                        onMoveDown={id => moveItem(id, 1)}
-                        showMoveUp={flatIdx > 0}
-                        showMoveDown={flatIdx < allOrdered.length - 1}
-                      />
+                      <div style={{
+                        ...styles.dateHeader,
+                        color: isUndecided ? C.undecided : C.primary,
+                        borderColor: isUndecided ? C.undecided : C.primary,
+                      }}>
+                        <span>{isUndecided ? '📌 日程未定' : formatDate(item.date)}</span>
+                        <span style={{ fontSize: 12, fontWeight: 400, color: C.textSub }}>
+                          {allItems.filter(x => (x.date || null) === (item.date || null)).length}件
+                        </span>
+                      </div>
                     );
-                  })}
-                </div>
-              ))}
-
-              {undecided.length > 0 && (
-                <div>
-                  <div style={{ ...styles.dateHeader, color: C.undecided, borderColor: C.undecided }}>
-                    <span>📌 日程未定</span>
-                    <span style={{ fontSize: 12, fontWeight: 400 }}>{undecided.length}件</span>
-                  </div>
-                  {undecided.map(item => {
-                    const flatIdx = allOrdered.findIndex(i => i.id === item.id);
-                    return (
-                      <ItemCard
-                        key={item.id}
-                        item={item}
-                        onTap={openEdit}
-                        onTimeChange={handleTimeChange}
-                        onDateChange={handleDateChange}
-                        onMoveUp={id => moveItem(id, -1)}
-                        onMoveDown={id => moveItem(id, 1)}
-                        showMoveUp={flatIdx > 0}
-                        showMoveDown={flatIdx < allOrdered.length - 1}
-                      />
-                    );
-                  })}
-                </div>
-              )}
+                  }
+                  return null;
+                }}
+              />
             </>
           );
         })()}
