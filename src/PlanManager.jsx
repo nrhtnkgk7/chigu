@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { useParams } from 'react-router-dom';
 
 const SUPABASE_URL = 'https://thukxeznpnwfqtoehyvc.supabase.co';
-const SUPABASE_ANON_KEY = 'YOUR_ANON_KEY_HERE'; // ← 既存と同じキーを入れてください
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRodWt4ZXpucG53ZnF0b2VoeXZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4Mzk1NTMsImV4cCI6MjA4ODQxNTU1M30._ZqXyb1slx-8WNmebptkeTNJdv-aUlJGRAwJZdsFkqo';
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -565,21 +565,30 @@ export default function PlanManager() {
   // ── Projects CRUD ──
   async function loadProjects() {
     setLoading(true);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('plan_projects')
       .select('*')
       .order('created_at', { ascending: false });
+    if (error) {
+      console.error('loadProjects error:', error);
+      alert('読み込みエラー: ' + error.message + '\n\nSupabaseでテーブルが作成されているか確認してください。');
+    }
     setProjects(data || []);
     setLoading(false);
   }
 
   async function createProject() {
     if (!newProjectName.trim()) return;
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('plan_projects')
       .insert({ name: newProjectName.trim() })
       .select()
       .single();
+    if (error) {
+      alert('作成エラー: ' + error.message);
+      console.error('createProject error:', error);
+      return;
+    }
     if (data) {
       setProjects(prev => [data, ...prev]);
       setNewProjectName('');
@@ -630,11 +639,15 @@ export default function PlanManager() {
       sort_order: items.length,
       ...itemData,
     };
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('plan_items')
       .insert(newItem)
       .select()
       .single();
+    if (error) {
+      alert('追加エラー: ' + error.message);
+      return;
+    }
     if (data) setItems(prev => [...prev, data]);
   }
 
@@ -644,10 +657,14 @@ export default function PlanManager() {
       sort_order: items.length + i,
       ...it,
     }));
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('plan_items')
       .insert(newItems)
       .select();
+    if (error) {
+      alert('一括追加エラー: ' + error.message);
+      return;
+    }
     if (data) setItems(prev => [...prev, ...data]);
   }
 
