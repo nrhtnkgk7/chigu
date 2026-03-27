@@ -581,66 +581,35 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
   const containerRef = useRef(null);
-  const dragState = useRef({ active: false, timer: null, startY: 0, scrollInterval: null, clone: null, offsetY: 0 });
+  const rectsRef = useRef([]);
+  const dragRef = useRef({ active: false, timer: null, startY: 0 });
 
-  function findItemIndex(el) {
-    const row = el.closest('[data-sort-idx]');
-    return row ? parseInt(row.getAttribute('data-sort-idx')) : null;
+  // Record all card positions when drag starts
+  function recordRects() {
+    if (!containerRef.current) return;
+    const cards = containerRef.current.querySelectorAll('[data-sort-idx]');
+    rectsRef.current = Array.from(cards).map(el => {
+      const r = el.getBoundingClientRect();
+      return { top: r.top + window.scrollY, height: r.height };
+    });
   }
 
-  function startAutoScroll(clientY) {
-    stopAutoScroll();
-    const edge = 80, speed = 8;
-    dragState.current.scrollInterval = setInterval(() => {
-      if (clientY < edge) window.scrollBy(0, -speed);
-      else if (clientY > window.innerHeight - edge) window.scrollBy(0, speed);
-    }, 16);
-  }
-  function stopAutoScroll() {
-    if (dragState.current.scrollInterval) {
-      clearInterval(dragState.current.scrollInterval);
-      dragState.current.scrollInterval = null;
+  // Find which index a Y position falls into
+  function idxFromY(clientY) {
+    const y = clientY + window.scrollY;
+    for (let i = 0; i < rectsRef.current.length; i++) {
+      const r = rectsRef.current[i];
+      const mid = r.top + r.height / 2;
+      if (y < mid) return i;
     }
-  }
-
-  function createClone(sourceEl, clientY) {
-    const rect = sourceEl.getBoundingClientRect();
-    const clone = sourceEl.cloneNode(true);
-    clone.style.position = 'fixed';
-    clone.style.left = rect.left + 'px';
-    clone.style.top = rect.top + 'px';
-    clone.style.width = rect.width + 'px';
-    clone.style.zIndex = '9999';
-    clone.style.pointerEvents = 'none';
-    clone.style.boxShadow = '0 8px 32px rgba(0,0,0,0.25)';
-    clone.style.borderRadius = '12px';
-    clone.style.transform = 'scale(1.03)';
-    clone.style.opacity = '0.95';
-    clone.style.transition = 'transform 0.15s ease, box-shadow 0.15s ease';
-    document.body.appendChild(clone);
-    dragState.current.clone = clone;
-    dragState.current.offsetY = clientY - rect.top;
-  }
-
-  function moveClone(clientY) {
-    if (!dragState.current.clone) return;
-    const top = clientY - dragState.current.offsetY;
-    dragState.current.clone.style.top = top + 'px';
-  }
-
-  function removeClone() {
-    if (dragState.current.clone) {
-      dragState.current.clone.remove();
-      dragState.current.clone = null;
-    }
+    return rectsRef.current.length - 1;
   }
 
   function cleanup() {
-    clearTimeout(dragState.current.timer);
-    stopAutoScroll();
-    removeClone();
+    clearTimeout(dragRef.current.timer);
     document.body.style.overflow = '';
-    dragState.current.active = false;
+    document.body.style.touchAction = '';
+    dragRef.current.active = false;
     setDragIdx(null);
     setOverIdx(null);
   }
@@ -648,49 +617,58 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
   function onTouchStart(e) {
     const handle = e.target.closest('.drag-handle');
     if (!handle) return;
-    const idx = findItemIndex(e.target);
-    if (idx === null) return;
+    const el = e.target.closest('[data-sort-idx]');
+    if (!el) return;
+    const idx = parseInt(el.getAttribute('data-sort-idx'));
 
     const touch = e.touches[0];
-    const cardEl = e.target.closest('[data-sort-idx]');
-    dragState.current.startY = touch.clientY;
-    dragState.current.timer = setTimeout(() => {
-      dragState.current.active = true;
+    dragRef.current.startY = touch.clientY;
+
+    dragRef.current.timer = setTimeout(() => {
+      dragRef.current.active = true;
+      recordRects();
       setDragIdx(idx);
       setOverIdx(idx);
       if (navigator.vibrate) navigator.vibrate(20);
       document.body.style.overflow = 'hidden';
-      if (cardEl) createClone(cardEl, touch.clientY);
+      document.body.style.touchAction = 'none';
     }, 200);
   }
 
   function onTouchMove(e) {
-    if (!dragState.current.active) {
-      const dy = Math.abs(e.touches[0].clientY - dragState.current.startY);
-      if (dy > 8) clearTimeout(dragState.current.timer);
+    if (!dragRef.current.active) {
+      const dy = Math.abs(e.touches[0].clientY - dragRef.current.startY);
+      if (dy > 8) { clearTimeout(dragRef.current.timer); }
       return;
     }
     e.preventDefault();
     const touch = e.touches[0];
-    moveClone(touch.clientY);
-    startAutoScroll(touch.clientY);
+    const newOver = idxFromY(touch.clientY);
+    setOverIdx(newOver);
 
-    // Temporarily hide clone to find element underneath
-    if (dragState.current.clone) dragState.current.clone.style.display = 'none';
-    const el = document.elementFromPoint(touch.clientX, touch.clientY);
-    if (dragState.current.clone) dragState.current.clone.style.display = '';
-    if (el) {
-      const idx = findItemIndex(el);
-      if (idx !== null) setOverIdx(idx);
-    }
+    // Auto-scroll at edges
+    const edge = 80, speed = 10;
+    if (touch.clientY < edge) window.scrollBy(0, -speed);
+    else if (touch.clientY > window.innerHeight - edge) window.scrollBy(0, speed);
   }
 
   function onTouchEnd() {
-    if (dragState.current.active && dragIdx !== null && overIdx !== null && dragIdx !== overIdx) {
+    if (dragRef.current.active && dragIdx !== null && overIdx !== null && dragIdx !== overIdx) {
       onReorder(dragIdx, overIdx);
     }
     cleanup();
   }
+
+  // Build display order: if dragging, show items in reordered preview
+  const displayItems = (() => {
+    if (dragIdx === null || overIdx === null || dragIdx === overIdx) return flatItems;
+    const arr = [...flatItems];
+    const [moved] = arr.splice(dragIdx, 1);
+    arr.splice(overIdx, 0, moved);
+    return arr;
+  })();
+
+  const draggingItem = dragIdx !== null ? flatItems[dragIdx] : null;
 
   return (
     <div
@@ -699,31 +677,25 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       onTouchCancel={cleanup}
+      style={{ position: 'relative' }}
     >
-      {flatItems.map((item, idx) => {
-        const isDragging = dragIdx === idx;
-        const isOver = overIdx === idx && dragIdx !== null && dragIdx !== overIdx;
-        const dropAbove = isOver && dragIdx > overIdx;
-        const dropBelow = isOver && dragIdx < overIdx;
+      {displayItems.map((item, idx) => {
+        const isDraggedItem = draggingItem && item.id === draggingItem.id;
 
         return (
           <div key={item.id}>
-            {renderSectionHeader && renderSectionHeader(item, idx, flatItems)}
+            {renderSectionHeader && renderSectionHeader(item, idx, displayItems)}
             <div
               data-sort-idx={idx}
               style={{
                 ...styles.itemCard,
-                opacity: isDragging ? 0.25 : 1,
-                background: isDragging ? C.borderLight : C.card,
-                height: isDragging ? 48 : undefined,
-                overflow: isDragging ? 'hidden' : undefined,
-                borderLeft: dropAbove || dropBelow ? `3px solid ${C.accent}` : `1px solid ${C.borderLight}`,
-                marginTop: dropAbove ? 4 : undefined,
-                marginBottom: dropBelow ? 4 : undefined,
-                transition: 'all 0.1s ease',
+                background: isDraggedItem ? C.confirmedBg : C.card,
+                borderLeft: isDraggedItem ? `4px solid ${C.confirmed}` : `1px solid ${C.borderLight}`,
+                boxShadow: isDraggedItem ? '0 2px 12px rgba(0,0,0,0.1)' : 'none',
+                transition: 'all 0.15s ease',
               }}
             >
-              {isDragging ? null : renderItem(item, idx)}
+              {renderItem(item, idx)}
             </div>
           </div>
         );
