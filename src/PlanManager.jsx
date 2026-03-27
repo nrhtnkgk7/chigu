@@ -581,18 +581,16 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
   const [dragIdx, setDragIdx] = useState(null);
   const [overIdx, setOverIdx] = useState(null);
   const containerRef = useRef(null);
-  const dragState = useRef({ active: false, timer: null, startY: 0, scrollInterval: null });
+  const dragState = useRef({ active: false, timer: null, startY: 0, scrollInterval: null, clone: null, offsetY: 0 });
 
   function findItemIndex(el) {
     const row = el.closest('[data-sort-idx]');
     return row ? parseInt(row.getAttribute('data-sort-idx')) : null;
   }
 
-  // Auto-scroll near edges
   function startAutoScroll(clientY) {
     stopAutoScroll();
-    const edge = 80;
-    const speed = 8;
+    const edge = 80, speed = 8;
     dragState.current.scrollInterval = setInterval(() => {
       if (clientY < edge) window.scrollBy(0, -speed);
       else if (clientY > window.innerHeight - edge) window.scrollBy(0, speed);
@@ -605,16 +603,48 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
     }
   }
 
+  function createClone(sourceEl, clientY) {
+    const rect = sourceEl.getBoundingClientRect();
+    const clone = sourceEl.cloneNode(true);
+    clone.style.position = 'fixed';
+    clone.style.left = rect.left + 'px';
+    clone.style.top = rect.top + 'px';
+    clone.style.width = rect.width + 'px';
+    clone.style.zIndex = '9999';
+    clone.style.pointerEvents = 'none';
+    clone.style.boxShadow = '0 8px 32px rgba(0,0,0,0.25)';
+    clone.style.borderRadius = '12px';
+    clone.style.transform = 'scale(1.03)';
+    clone.style.opacity = '0.95';
+    clone.style.transition = 'transform 0.15s ease, box-shadow 0.15s ease';
+    document.body.appendChild(clone);
+    dragState.current.clone = clone;
+    dragState.current.offsetY = clientY - rect.top;
+  }
+
+  function moveClone(clientY) {
+    if (!dragState.current.clone) return;
+    const top = clientY - dragState.current.offsetY;
+    dragState.current.clone.style.top = top + 'px';
+  }
+
+  function removeClone() {
+    if (dragState.current.clone) {
+      dragState.current.clone.remove();
+      dragState.current.clone = null;
+    }
+  }
+
   function cleanup() {
     clearTimeout(dragState.current.timer);
     stopAutoScroll();
+    removeClone();
     document.body.style.overflow = '';
     dragState.current.active = false;
     setDragIdx(null);
     setOverIdx(null);
   }
 
-  // ── Touch Events (handle on ≡ only) ──
   function onTouchStart(e) {
     const handle = e.target.closest('.drag-handle');
     if (!handle) return;
@@ -622,6 +652,7 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
     if (idx === null) return;
 
     const touch = e.touches[0];
+    const cardEl = e.target.closest('[data-sort-idx]');
     dragState.current.startY = touch.clientY;
     dragState.current.timer = setTimeout(() => {
       dragState.current.active = true;
@@ -629,6 +660,7 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
       setOverIdx(idx);
       if (navigator.vibrate) navigator.vibrate(20);
       document.body.style.overflow = 'hidden';
+      if (cardEl) createClone(cardEl, touch.clientY);
     }, 200);
   }
 
@@ -640,8 +672,13 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
     }
     e.preventDefault();
     const touch = e.touches[0];
+    moveClone(touch.clientY);
     startAutoScroll(touch.clientY);
+
+    // Temporarily hide clone to find element underneath
+    if (dragState.current.clone) dragState.current.clone.style.display = 'none';
     const el = document.elementFromPoint(touch.clientX, touch.clientY);
+    if (dragState.current.clone) dragState.current.clone.style.display = '';
     if (el) {
       const idx = findItemIndex(el);
       if (idx !== null) setOverIdx(idx);
@@ -676,15 +713,17 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
               data-sort-idx={idx}
               style={{
                 ...styles.itemCard,
-                opacity: isDragging ? 0.35 : 1,
-                background: isDragging ? C.primaryBg : C.card,
-                borderTop: dropAbove ? `3px solid ${C.accent}` : undefined,
-                borderBottom: dropBelow ? `3px solid ${C.accent}` : undefined,
-                transform: isDragging ? 'scale(0.97)' : 'none',
-                transition: 'all 0.12s ease',
+                opacity: isDragging ? 0.25 : 1,
+                background: isDragging ? C.borderLight : C.card,
+                height: isDragging ? 48 : undefined,
+                overflow: isDragging ? 'hidden' : undefined,
+                borderLeft: dropAbove || dropBelow ? `3px solid ${C.accent}` : `1px solid ${C.borderLight}`,
+                marginTop: dropAbove ? 4 : undefined,
+                marginBottom: dropBelow ? 4 : undefined,
+                transition: 'all 0.1s ease',
               }}
             >
-              {renderItem(item, idx)}
+              {isDragging ? null : renderItem(item, idx)}
             </div>
           </div>
         );
