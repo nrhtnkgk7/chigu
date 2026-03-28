@@ -701,6 +701,31 @@ export default function PlanManager() {
   const params = useParams();
   const shareId = params.shareId || null;
 
+  // Secret gate: 5 taps to unlock (skip for shared view)
+  const [unlocked, setUnlocked] = useState(!!shareId);
+  const tapRef = useRef({ count: 0, timer: null });
+
+  function handleGateTap() {
+    tapRef.current.count++;
+    clearTimeout(tapRef.current.timer);
+    if (tapRef.current.count >= 5) {
+      setUnlocked(true);
+      return;
+    }
+    // Reset after 2 seconds of no taps
+    tapRef.current.timer = setTimeout(() => { tapRef.current.count = 0; }, 2000);
+  }
+
+  if (!unlocked) {
+    return (
+      <div onClick={handleGateTap} style={{
+        position: 'fixed', inset: 0, background: '#fff', zIndex: 9999,
+        cursor: 'default', WebkitTapHighlightColor: 'transparent',
+        userSelect: 'none', WebkitUserSelect: 'none',
+      }} />
+    );
+  }
+
   const [view, setView] = useState('projects'); // projects | detail
   const [projects, setProjects] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
