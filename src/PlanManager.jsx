@@ -723,6 +723,8 @@ export default function PlanManager() {
   });
   const [newProjectName, setNewProjectName] = useState('');
   const [copySuccess, setCopySuccess] = useState(null); // null | 'link' | 'text'
+  const [exportIncludeUrl, setExportIncludeUrl] = useState(false);
+  const [exportPriceOnly, setExportPriceOnly] = useState(false);
 
   const exportRef = useRef(null);
 
@@ -1069,14 +1071,17 @@ export default function PlanManager() {
   }
 
   // ── Export ──
-  function generateTextSchedule() {
-    const { groups, sortedDates, undecided } = groupByDate(items);
+  function generateTextSchedule(opts = {}) {
+    const { includeUrl = false, priceOnly = false } = opts;
+    const src = priceOnly ? items.filter(it => it.price != null) : items;
+    const { groups, sortedDates, undecided } = groupByDate(src);
     let text = '';
     for (const date of sortedDates) {
       text += formatDate(date) + '\n';
       for (const item of groups[date]) {
         text += (item.time || '---') + ' ' + item.name;
-        if (item.url) text += ' ' + item.url;
+        if (item.price != null) text += ' ₩' + Number(item.price).toLocaleString();
+        if (includeUrl && item.url) text += ' ' + item.url;
         text += '\n';
       }
       text += '\n';
@@ -1085,15 +1090,20 @@ export default function PlanManager() {
       text += '日程未定\n';
       for (const item of undecided) {
         text += (item.time || '---') + ' ' + item.name;
-        if (item.url) text += ' ' + item.url;
+        if (item.price != null) text += ' ₩' + Number(item.price).toLocaleString();
+        if (includeUrl && item.url) text += ' ' + item.url;
         text += '\n';
       }
+    }
+    if (priceOnly) {
+      const total = src.reduce((s, it) => s + (it.price || 0), 0);
+      text += '\n合計: ₩' + total.toLocaleString() + ' (' + src.length + '件)';
     }
     return text.trim();
   }
 
-  async function copyTextSchedule() {
-    const text = generateTextSchedule();
+  async function copyTextSchedule(opts = {}) {
+    const text = generateTextSchedule(opts);
     try {
       await navigator.clipboard.writeText(text);
       setCopySuccess('text');
@@ -1110,30 +1120,59 @@ export default function PlanManager() {
     }
   }
 
-  async function exportSchedule(format) {
+  async function exportSchedule(format, priceOnly = false) {
     const el = exportRef.current;
     if (!el) return;
 
-    // dynamic import
-    const html2canvas = (await import('html2canvas')).default;
+    // Temporarily update export content
+    const src = priceOnly ? items.filter(it => it.price != null) : items;
+    const { groups: eg, sortedDates: esd, undecided: eu } = groupByDate(src);
+    const total = priceOnly ? src.reduce((s, it) => s + (it.price || 0), 0) : null;
 
+    // Build HTML for export
+    let html = `<h1 style="font-size:24px;color:${C.primary};margin-bottom:24px;font-family:'Noto Sans JP',sans-serif">${currentProject?.name}${priceOnly ? ' — 金額一覧' : ''}</h1>`;
+    for (const date of esd) {
+      html += `<div style="font-size:16px;font-weight:700;color:${C.primary};border-bottom:2px solid ${C.primary};padding-bottom:6px;margin-bottom:10px">${formatDate(date)}</div>`;
+      for (const item of eg[date]) {
+        html += `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid ${C.borderLight};font-size:14px;font-family:'Noto Sans JP',sans-serif">`;
+        html += `<span style="width:50px;font-weight:700;color:${C.primary}">${item.time || '---'}</span>`;
+        html += `<span style="flex:1">${item.name}</span>`;
+        if (item.price != null) html += `<span style="color:#e65100;font-weight:600">₩${Number(item.price).toLocaleString()}</span>`;
+        html += `<span style="color:${STATUS_CONFIG[item.status]?.color};font-size:12px">${item.status}</span>`;
+        html += `</div>`;
+      }
+      html += `<div style="margin-bottom:20px"></div>`;
+    }
+    if (eu.length > 0) {
+      html += `<div style="font-size:16px;font-weight:700;color:${C.undecided};border-bottom:2px solid ${C.undecided};padding-bottom:6px;margin-bottom:10px">日程未定</div>`;
+      for (const item of eu) {
+        html += `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid ${C.borderLight};font-size:14px;font-family:'Noto Sans JP',sans-serif">`;
+        html += `<span style="width:50px;font-weight:700;color:${C.textLight}">---</span>`;
+        html += `<span style="flex:1">${item.name}</span>`;
+        if (item.price != null) html += `<span style="color:#e65100;font-weight:600">₩${Number(item.price).toLocaleString()}</span>`;
+        html += `</div>`;
+      }
+    }
+    if (total != null) {
+      html += `<div style="margin-top:20px;padding:12px;border-top:2px solid ${C.primary};font-size:16px;font-weight:700;font-family:'Noto Sans JP',sans-serif">合計: ₩${total.toLocaleString()} (${src.length}件)</div>`;
+    }
+
+    el.innerHTML = html;
+
+    const html2canvas = (await import('html2canvas')).default;
     el.style.position = 'fixed';
     el.style.left = '0';
     el.style.top = '0';
     el.style.zIndex = '9999';
 
-    const canvas = await html2canvas(el, {
-      scale: 2,
-      useCORS: true,
-      backgroundColor: '#ffffff',
-    });
+    const canvas = await html2canvas(el, { scale: 2, useCORS: true, backgroundColor: '#ffffff' });
 
     el.style.position = 'absolute';
     el.style.left = '-9999px';
 
     if (format === 'jpg') {
       const link = document.createElement('a');
-      link.download = `${currentProject.name}.jpg`;
+      link.download = `${currentProject.name}${priceOnly ? '_金額' : ''}.jpg`;
       link.href = canvas.toDataURL('image/jpeg', 0.95);
       link.click();
     } else {
@@ -1141,7 +1180,7 @@ export default function PlanManager() {
       const imgData = canvas.toDataURL('image/jpeg', 0.95);
       const pdf = new jsPDF('p', 'px', [canvas.width / 2, canvas.height / 2]);
       pdf.addImage(imgData, 'JPEG', 0, 0, canvas.width / 2, canvas.height / 2);
-      pdf.save(`${currentProject.name}.pdf`);
+      pdf.save(`${currentProject.name}${priceOnly ? '_金額' : ''}.pdf`);
     }
   }
 
@@ -1640,40 +1679,64 @@ export default function PlanManager() {
       {modal === 'share' && (
         <div style={styles.modal} onClick={() => setModal(null)}>
           <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-            <div style={styles.modalTitle}>共有 & エクスポート</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: C.primary }}>共有 & エクスポート</span>
+              <button onClick={() => setModal(null)}
+                style={{ ...baseBtn, background: 'none', color: C.textLight, fontSize: 22, padding: '4px 8px' }}>×</button>
+            </div>
 
-            <label style={styles.label}>共有リンク</label>
+            {/* Share link */}
+            <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 6 }}>共有リンク</div>
             <div style={styles.shareBox}>
               <span style={styles.shareUrl}>{getShareUrl()}</span>
               <button style={styles.copyBtn} onClick={copyShareUrl}>
                 {copySuccess === 'link' ? '✓' : 'コピー'}
               </button>
             </div>
-            <div style={{ fontSize: 11, color: C.textLight, marginTop: 6 }}>
-              このリンクを共有すると、誰でもスケジュールを閲覧できます
+
+            {/* Export scope toggle */}
+            <div style={{ display: 'flex', gap: 6, marginTop: 20, marginBottom: 10 }}>
+              <button style={{
+                ...baseBtn, flex: 1, padding: '8px', fontSize: 12,
+                background: !exportPriceOnly ? C.primary : '#f5f4f1',
+                color: !exportPriceOnly ? C.white : C.textSub,
+                border: `1.5px solid ${!exportPriceOnly ? C.primary : 'transparent'}`,
+              }} onClick={() => setExportPriceOnly(false)}>すべて</button>
+              <button style={{
+                ...baseBtn, flex: 1, padding: '8px', fontSize: 12,
+                background: exportPriceOnly ? '#e65100' : '#f5f4f1',
+                color: exportPriceOnly ? C.white : C.textSub,
+                border: `1.5px solid ${exportPriceOnly ? '#e65100' : 'transparent'}`,
+              }} onClick={() => setExportPriceOnly(true)}>₩ 金額ありのみ</button>
             </div>
 
-            <label style={{ ...styles.label, marginTop: 24 }}>テキスト出力</label>
-            <div style={{ background: C.bg, borderRadius: 10, padding: 12, maxHeight: 180, overflow: 'auto', fontSize: 13, color: C.text, whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'monospace', border: `1px solid ${C.border}` }}>
-              {generateTextSchedule() || 'スケジュールがありません'}
+            {/* Text preview */}
+            <div style={{ background: '#f8f7f4', borderRadius: 8, padding: 10, maxHeight: 160, overflow: 'auto',
+              fontSize: 12, color: C.text, whiteSpace: 'pre-wrap', lineHeight: 1.6, fontFamily: 'monospace',
+              border: `1px solid ${C.border}` }}>
+              {generateTextSchedule({ includeUrl: exportIncludeUrl, priceOnly: exportPriceOnly }) || 'データなし'}
             </div>
-            <button style={{ ...styles.secondaryBtn, marginTop: 8 }} onClick={copyTextSchedule}>
-              {copySuccess === 'text' ? '✓ コピー済み' : '📋 テキストをコピー'}
-            </button>
 
-            <label style={{ ...styles.label, marginTop: 24 }}>ダウンロード</label>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <button style={styles.secondaryBtn} onClick={() => exportSchedule('pdf')}>
-                📄 PDF
+            {/* URL toggle + copy */}
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, alignItems: 'center' }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: C.textSub, cursor: 'pointer', flexShrink: 0 }}>
+                <input type="checkbox" checked={exportIncludeUrl} onChange={e => setExportIncludeUrl(e.target.checked)}
+                  style={{ width: 16, height: 16 }} />
+                URLを含める
+              </label>
+              <button style={{ ...styles.secondaryBtn, flex: 1, marginTop: 0, padding: '8px', fontSize: 12 }}
+                onClick={() => copyTextSchedule({ includeUrl: exportIncludeUrl, priceOnly: exportPriceOnly })}>
+                {copySuccess === 'text' ? '✓ コピー済み' : '📋 テキストコピー'}
               </button>
-              <button style={styles.secondaryBtn} onClick={() => exportSchedule('jpg')}>
-                🖼️ JPG
-              </button>
             </div>
 
-            <button style={{ ...styles.secondaryBtn, marginTop: 20 }} onClick={() => setModal(null)}>
-              閉じる
-            </button>
+            {/* PDF / JPG */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 12 }}>
+              <button style={{ ...styles.secondaryBtn, marginTop: 0, padding: '8px', fontSize: 12 }}
+                onClick={() => exportSchedule('pdf', exportPriceOnly)}>📄 PDF</button>
+              <button style={{ ...styles.secondaryBtn, marginTop: 0, padding: '8px', fontSize: 12 }}
+                onClick={() => exportSchedule('jpg', exportPriceOnly)}>🖼️ JPG</button>
+            </div>
           </div>
         </div>
       )}
@@ -1703,60 +1766,7 @@ export default function PlanManager() {
       )}
 
       {/* Hidden Export Element */}
-      <div ref={exportRef} style={styles.exportContainer}>
-        <h1 style={{ fontSize: 24, color: C.primary, marginBottom: 24 }}>
-          {currentProject?.name}
-        </h1>
-        {sortedDates.map(date => (
-          <div key={date} style={{ marginBottom: 20 }}>
-            <div style={{
-              fontSize: 16, fontWeight: 700, color: C.primary,
-              borderBottom: `2px solid ${C.primary}`, paddingBottom: 6, marginBottom: 10,
-            }}>
-              {formatDate(date)}
-            </div>
-            {groups[date].map(item => (
-              <div key={item.id} style={{
-                display: 'flex', gap: 12, padding: '8px 0',
-                borderBottom: `1px solid ${C.borderLight}`, fontSize: 14,
-              }}>
-                <span style={{ width: 50, fontWeight: 700, color: C.primary }}>
-                  {item.time || '---'}
-                </span>
-                <span style={{ flex: 1 }}>{item.name}</span>
-                <span style={{
-                  color: STATUS_CONFIG[item.status]?.color,
-                  fontSize: 12,
-                }}>{item.status}</span>
-                {item.genre && <span style={{ color: C.textSub, fontSize: 12 }}>{item.genre}</span>}
-              </div>
-            ))}
-          </div>
-        ))}
-        {undecided.length > 0 && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{
-              fontSize: 16, fontWeight: 700, color: C.undecided,
-              borderBottom: `2px solid ${C.undecided}`, paddingBottom: 6, marginBottom: 10,
-            }}>
-              日程未定
-            </div>
-            {undecided.map(item => (
-              <div key={item.id} style={{
-                display: 'flex', gap: 12, padding: '8px 0',
-                borderBottom: `1px solid ${C.borderLight}`, fontSize: 14,
-              }}>
-                <span style={{ width: 50, fontWeight: 700, color: C.textLight }}>---</span>
-                <span style={{ flex: 1 }}>{item.name}</span>
-                <span style={{
-                  color: STATUS_CONFIG[item.status]?.color,
-                  fontSize: 12,
-                }}>{item.status}</span>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <div ref={exportRef} style={styles.exportContainer}></div>
     </div>
   );
 }
