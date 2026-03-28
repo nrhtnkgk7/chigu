@@ -119,9 +119,14 @@ function groupByDate(items) {
     }
   }
   const sortedDates = Object.keys(groups).sort();
-  // sort_order優先（手動並び替え対応）
+  // 同一日内は時間順（時間なしは末尾、同時間はsort_order順）
   sortedDates.forEach(date => {
-    groups[date].sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+    groups[date].sort((a, b) => {
+      if (a.time && b.time) return a.time.localeCompare(b.time) || (a.sort_order ?? 0) - (b.sort_order ?? 0);
+      if (a.time && !b.time) return -1;
+      if (!a.time && b.time) return 1;
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    });
   });
   undecided.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
   return { groups, sortedDates, undecided };
@@ -466,7 +471,7 @@ const styles = {
 };
 
 // ── Item Card Component (pure display) ──
-function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange }) {
+function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange, onTogglePhoto }) {
   const [editingTime, setEditingTime] = useState(false);
   const [editingDate, setEditingDate] = useState(false);
   const [tempTime, setTempTime] = useState(item.time || '');
@@ -547,29 +552,56 @@ function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange }) {
               ₩{Number(item.price).toLocaleString()}
             </span>
           )}
+          {item.want_photo && (
+            <span style={{ fontSize: 10, fontWeight: 700, color: '#1565c0', background: '#e3f2fd',
+              padding: '2px 6px', borderRadius: 4 }}>📷 撮りたい絵</span>
+          )}
         </div>
+        {/* Photo tag toggle */}
+        {!readonly && (
+          <div style={{ marginTop: 4 }}>
+            <span
+              onClick={e => { e.stopPropagation(); if (onTogglePhoto) onTogglePhoto(item.id, !item.want_photo); }}
+              style={{ fontSize: 11, cursor: 'pointer', padding: '2px 8px', borderRadius: 6,
+                color: item.want_photo ? '#c62828' : '#1565c0',
+                background: item.want_photo ? '#ffebee' : '#e3f2fd',
+                fontWeight: 600 }}
+            >
+              {item.want_photo ? '📷 タグを外す' : '📷 撮りたい絵'}
+            </span>
+          </div>
+        )}
         {item.genre && <div style={styles.itemSub}>{item.genre}</div>}
         {item.memo && <div style={{ ...styles.itemSub, fontStyle: 'italic' }}>{item.memo}</div>}
 
-        {/* Inline date for undecided */}
-        {!item.date && !readonly && (
+        {/* Inline date controls */}
+        {!readonly && (
           <div style={{ marginTop: 6 }}>
-            {editingDate ? (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                <input type="date" value={tempDate} onChange={e => setTempDate(e.target.value)} autoFocus
-                  style={{ border: `1px solid ${C.accent}`, borderRadius: 6, padding: '4px 8px', fontSize: 16,
-                    fontFamily: '"Noto Sans JP", sans-serif', color: C.primary, background: C.white, outline: 'none' }} />
-                <button onClick={handleDateSubmit}
-                  style={{ border: 'none', background: C.primary, color: C.white, borderRadius: 6,
-                    padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontFamily: '"Noto Sans JP", sans-serif' }}>決定</button>
-                <button onClick={() => setEditingDate(false)}
-                  style={{ border: `1px solid ${C.border}`, background: C.white, color: C.textSub, borderRadius: 6,
-                    padding: '4px 8px', fontSize: 12, cursor: 'pointer', fontFamily: '"Noto Sans JP", sans-serif' }}>×</button>
-              </div>
+            {!item.date ? (
+              editingDate ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
+                  <input type="date" value={tempDate} onChange={e => setTempDate(e.target.value)} autoFocus
+                    style={{ border: `1px solid ${C.accent}`, borderRadius: 6, padding: '4px 8px', fontSize: 16,
+                      fontFamily: '"Noto Sans JP", sans-serif', color: C.primary, background: C.white, outline: 'none' }} />
+                  <button onClick={handleDateSubmit}
+                    style={{ border: 'none', background: C.primary, color: C.white, borderRadius: 6,
+                      padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontFamily: '"Noto Sans JP", sans-serif' }}>決定</button>
+                  <button onClick={() => setEditingDate(false)}
+                    style={{ border: `1px solid ${C.border}`, background: C.white, color: C.textSub, borderRadius: 6,
+                      padding: '4px 8px', fontSize: 12, cursor: 'pointer', fontFamily: '"Noto Sans JP", sans-serif' }}>×</button>
+                </div>
+              ) : (
+                <span onClick={e => { e.stopPropagation(); setTempDate(''); setEditingDate(true); }}
+                  style={{ fontSize: 12, color: C.accent, cursor: 'pointer', padding: '2px 8px', borderRadius: 6,
+                    background: C.maybeBg, fontWeight: 600 }}>+ 日付を設定</span>
+              )
             ) : (
-              <span onClick={e => { e.stopPropagation(); setTempDate(''); setEditingDate(true); }}
-                style={{ fontSize: 12, color: C.accent, cursor: 'pointer', padding: '2px 8px', borderRadius: 6,
-                  background: C.maybeBg, fontWeight: 600 }}>+ 日付を設定</span>
+              <span
+                onClick={e => { e.stopPropagation(); if (onDateChange) onDateChange(item.id, null); }}
+                style={{ fontSize: 11, color: C.undecided, cursor: 'pointer', padding: '2px 8px', borderRadius: 6,
+                  background: C.undecidedBg }}>
+                ✕ 日程を未定に戻す
+              </span>
             )}
           </div>
         )}
@@ -695,8 +727,9 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
         const isDraggedItem = draggingItem && item.id === draggingItem.id;
 
         const hasPrice = item.price != null;
-        const cardBg = isDraggedItem ? C.confirmedBg : hasPrice ? '#fff8f0' : C.card;
-        const cardBorderLeft = isDraggedItem ? `4px solid ${C.confirmed}` : hasPrice ? `3px solid #ffb74d` : `1px solid ${C.borderLight}`;
+        const hasPhoto = item.want_photo;
+        const cardBg = isDraggedItem ? C.confirmedBg : hasPhoto ? '#e8f0fe' : hasPrice ? '#fff8f0' : C.card;
+        const cardBorderLeft = isDraggedItem ? `4px solid ${C.confirmed}` : hasPhoto ? `3px solid #4285f4` : hasPrice ? `3px solid #ffb74d` : `1px solid ${C.borderLight}`;
 
         return (
           <div key={item.id}>
@@ -748,33 +781,14 @@ export default function PlanManager() {
 
   function handleTimeChange(id, time) {
     updateItem(id, { time });
-    // Auto-sort within same date by time
-    setTimeout(() => {
-      setItems(prev => {
-        const item = prev.find(i => i.id === id);
-        if (!item || !item.date) return prev;
-        const sameDate = prev.filter(i => i.date === item.date).sort((a, b) => {
-          const ta = a.id === id ? (time || '') : (a.time || '');
-          const tb = b.id === id ? (time || '') : (b.time || '');
-          if (!ta && !tb) return 0;
-          if (!ta) return 1;
-          if (!tb) return -1;
-          return ta.localeCompare(tb);
-        });
-        // Re-assign sort_order within this date
-        const otherItems = prev.filter(i => i.date !== item.date);
-        const minOrder = Math.min(...sameDate.map(i => i.sort_order ?? 0));
-        const reordered = sameDate.map((it, i) => ({ ...it, sort_order: minOrder + i }));
-        reordered.forEach(it => {
-          supabase.from('plan_items').update({ sort_order: it.sort_order }).eq('id', it.id);
-        });
-        return [...otherItems, ...reordered];
-      });
-    }, 100);
   }
 
   function handleDateChange(id, date) {
     updateItem(id, { date });
+  }
+
+  function handleTogglePhoto(id, value) {
+    updateItem(id, { want_photo: value });
   }
 
   // Build flat ordered list from grouped data
@@ -797,9 +811,27 @@ export default function PlanManager() {
     const [moved] = arr.splice(fromIdx, 1);
     arr.splice(toIdx, 0, moved);
 
+    // Determine new date and time from neighbors
+    const prev = toIdx > 0 ? arr[toIdx - 1] : null;
+    const next = toIdx < arr.length - 1 ? arr[toIdx + 1] : null;
+
+    // Adopt date from nearest neighbor
+    const neighborDate = (prev?.date || next?.date) || moved.date;
+    moved.date = neighborDate;
+
+    // Auto-assign time between neighbors if both have times on same date
+    if (prev?.date === neighborDate && next?.date === neighborDate && prev?.time && next?.time) {
+      moved.time = midpointTime(prev.time, next.time);
+    } else if (prev?.date === neighborDate && prev?.time && (!next || next?.date !== neighborDate)) {
+      // After last item with time: add 30 min
+      moved.time = addMinutes(prev.time, 30);
+    } else if (next?.date === neighborDate && next?.time && (!prev || prev?.date !== neighborDate)) {
+      // Before first item with time: subtract 30 min
+      moved.time = addMinutes(next.time, -30);
+    }
+
     // Update sort_order for all reordered items
     const updates = arr.map((it, i) => ({ ...it, sort_order: i }));
-    // Merge back with any filtered-out items
     const updatedIds = new Set(updates.map(u => u.id));
     const newItems = [
       ...updates,
@@ -807,10 +839,37 @@ export default function PlanManager() {
     ];
     setItems(newItems);
 
-    // Persist
+    // Persist moved item's date + time + sort_order, others just sort_order
     for (const it of updates) {
-      await supabase.from('plan_items').update({ sort_order: it.sort_order }).eq('id', it.id);
+      if (it.id === moved.id) {
+        await supabase.from('plan_items').update({ sort_order: it.sort_order, date: it.date, time: it.time }).eq('id', it.id);
+      } else {
+        await supabase.from('plan_items').update({ sort_order: it.sort_order }).eq('id', it.id);
+      }
     }
+  }
+
+  function midpointTime(t1, t2) {
+    const [h1, m1] = t1.split(':').map(Number);
+    const [h2, m2] = t2.split(':').map(Number);
+    const min1 = h1 * 60 + m1;
+    const min2 = h2 * 60 + m2;
+    const mid = Math.round((min1 + min2) / 2);
+    // Round to nearest 5 min
+    const rounded = Math.round(mid / 5) * 5;
+    const h = Math.floor(rounded / 60) % 24;
+    const m = rounded % 60;
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  }
+
+  function addMinutes(t, mins) {
+    const [h, m] = t.split(':').map(Number);
+    let total = h * 60 + m + mins;
+    if (total < 0) total = 0;
+    if (total >= 1440) total = 1439;
+    const rh = Math.floor(total / 60);
+    const rm = total % 60;
+    return `${String(rh).padStart(2, '0')}:${String(rm).padStart(2, '0')}`;
   }
 
   // ── Shared View ──
@@ -1373,6 +1432,7 @@ export default function PlanManager() {
                     onTap={openEdit}
                     onTimeChange={handleTimeChange}
                     onDateChange={handleDateChange}
+                    onTogglePhoto={handleTogglePhoto}
                   />
                 )}
                 renderSectionHeader={(item, idx, allItems) => {
