@@ -153,7 +153,7 @@ const styles = {
   header: {
     background: C.primary,
     color: C.white,
-    padding: '16px 20px',
+    padding: '10px 16px',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -162,26 +162,26 @@ const styles = {
     zIndex: 100,
   },
   headerTitle: {
-    fontSize: 18,
+    fontSize: 14,
     fontWeight: 700,
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   headerBtn: {
     ...baseBtn,
     background: 'rgba(255,255,255,0.15)',
     color: C.white,
-    padding: '8px 14px',
-    fontSize: 13,
+    padding: '6px 10px',
+    fontSize: 11,
   },
   backBtn: {
     ...baseBtn,
     background: 'none',
     color: C.white,
-    padding: '8px 0',
-    fontSize: 14,
+    padding: '4px 0',
+    fontSize: 12,
     display: 'flex',
     alignItems: 'center',
-    gap: 4,
+    gap: 2,
   },
   body: {
     padding: '16px 16px 100px',
@@ -1274,7 +1274,7 @@ export default function PlanManager() {
         <button style={styles.backBtn} onClick={() => { setView('projects'); setCurrentProject(null); }}>
           ‹ 戻る
         </button>
-        <span style={{ ...styles.headerTitle, flex: 1, textAlign: 'center', fontSize: 15 }}>
+        <span style={{ ...styles.headerTitle, flex: 1, textAlign: 'center', fontSize: 13 }}>
           {currentProject?.name}
         </span>
         <div style={{ display: 'flex', gap: 6 }}>
@@ -1557,7 +1557,7 @@ export default function PlanManager() {
             )}
 
             {/* Form fields - compact grid */}
-            <input style={{ ...styles.input, marginBottom: 10, fontWeight: 600 }} value={formData.name}
+            <input style={{ ...styles.input, marginBottom: 10, fontWeight: 600, height: 44 }} value={formData.name}
               onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} placeholder="店名 / スポット名 *" />
 
             <input type="datetime-local"
@@ -1571,7 +1571,7 @@ export default function PlanManager() {
                   setFormData(p => ({ ...p, date: '', time: '' }));
                 }
               }}
-              style={{ ...styles.input, marginBottom: 10 }}
+              style={{ ...styles.input, marginBottom: 10, height: 44 }}
             />
 
             {/* Status row */}
