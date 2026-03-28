@@ -247,6 +247,10 @@ const styles = {
     background: '#f9f8f5',
     boxSizing: 'border-box',
     outline: 'none',
+    WebkitAppearance: 'none',
+    MozAppearance: 'none',
+    appearance: 'none',
+    maxWidth: '100%',
   },
   textarea: {
     width: '100%',
@@ -1556,7 +1560,7 @@ export default function PlanManager() {
             <input style={{ ...styles.input, marginBottom: 10, fontWeight: 600 }} value={formData.name}
               onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} placeholder="店名 / スポット名 *" />
 
-            <input style={{ ...styles.input, marginBottom: 10 }} type="datetime-local"
+            <input type="datetime-local"
               value={(formData.date && formData.time) ? `${formData.date}T${formData.time}` : formData.date ? `${formData.date}T00:00` : ''}
               onChange={e => {
                 const v = e.target.value;
@@ -1566,7 +1570,9 @@ export default function PlanManager() {
                 } else {
                   setFormData(p => ({ ...p, date: '', time: '' }));
                 }
-              }} />
+              }}
+              style={{ ...styles.input, marginBottom: 10 }}
+            />
 
             {/* Status row */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
