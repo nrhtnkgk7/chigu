@@ -449,19 +449,25 @@ const styles = {
   },
   tabBar: {
     display: 'flex',
-    gap: 6,
-    padding: '12px 0',
-    overflowX: 'auto',
+    background: '#ece8e3',
+    borderRadius: 8,
+    padding: 2,
+    margin: '8px 0',
   },
-  tab: (active) => ({
-    ...baseBtn,
-    background: active ? C.primary : C.card,
-    color: active ? C.white : C.textSub,
-    padding: '8px 16px',
-    fontSize: 13,
-    border: `1px solid ${active ? C.primary : C.border}`,
-    borderRadius: 20,
+  tab: (active, accentColor) => ({
+    border: 'none',
+    borderRadius: 6,
+    padding: '7px 0',
+    fontSize: 10,
+    fontWeight: 600,
+    cursor: 'pointer',
+    flex: 1,
+    fontFamily: '"Noto Sans JP", sans-serif',
     whiteSpace: 'nowrap',
+    background: active ? '#fff' : 'transparent',
+    color: active ? (accentColor || C.primary) : C.textLight,
+    boxShadow: active ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+    transition: 'all 0.15s ease',
   }),
   exportContainer: {
     position: 'absolute',
@@ -474,7 +480,7 @@ const styles = {
   },
 };
 
-// ── Item Card Component (minimal, refined) ──
+// ── Item Card Component (flat list style) ──
 function ItemCard({ item, onTap, readonly, onTimeChange }) {
   const [editingTime, setEditingTime] = useState(false);
   const [tempTime, setTempTime] = useState(item.time || '');
@@ -484,67 +490,59 @@ function ItemCard({ item, onTap, readonly, onTimeChange }) {
     setEditingTime(false);
   }
 
+  const sc = STATUS_CONFIG[item.status] || STATUS_CONFIG['未定'];
+
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
       {!readonly && (
         <div className="drag-handle" style={{
           color: C.textLight, fontSize: 14, cursor: 'grab', touchAction: 'none',
-          userSelect: 'none', flexShrink: 0, opacity: 0.4,
+          userSelect: 'none', flexShrink: 0, opacity: 0.3,
         }}>⠿</div>
       )}
 
       {/* Time */}
-      <div style={{ minWidth: 46, flexShrink: 0 }}>
+      <div style={{ width: 42, flexShrink: 0 }}>
         {editingTime && !readonly ? (
           <input type="time" value={tempTime}
             onChange={e => setTempTime(e.target.value)}
             onBlur={handleTimeSubmit}
             onKeyDown={e => e.key === 'Enter' && handleTimeSubmit()}
             autoFocus
-            style={{ width: 58, border: `1.5px solid ${C.accent}`, borderRadius: 5,
-              padding: '3px 4px', fontSize: 14, fontFamily: '"Noto Sans JP", sans-serif',
+            style={{ width: 56, border: `1.5px solid ${C.accent}`, borderRadius: 5,
+              padding: '3px 4px', fontSize: 13, fontFamily: '"Noto Sans JP", sans-serif',
               color: C.primary, background: '#fff', outline: 'none' }}
             onClick={e => e.stopPropagation()} />
         ) : (
           <span onClick={e => { if (readonly) return; e.stopPropagation(); setTempTime(item.time || ''); setEditingTime(true); }}
-            style={{ fontSize: 14, fontWeight: 700, color: item.time ? C.primary : C.textLight,
-              fontVariantNumeric: 'tabular-nums', cursor: readonly ? 'default' : 'pointer',
-              letterSpacing: '0.5px' }}>
+            style={{ fontSize: 13, fontWeight: 700, color: item.time ? C.primary : C.textLight,
+              fontVariantNumeric: 'tabular-nums', cursor: readonly ? 'default' : 'pointer' }}>
             {item.time || '---'}
           </span>
         )}
       </div>
 
-      {/* Name + indicators */}
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}
+      {/* Name */}
+      <span style={{ fontSize: 14, fontWeight: 500, flex: 1, color: C.text, overflow: 'hidden',
+        textOverflow: 'ellipsis', whiteSpace: 'nowrap', cursor: readonly ? 'default' : 'pointer' }}
         onClick={() => !readonly && onTap && onTap(item)}>
-        <span style={{ fontSize: 14, fontWeight: 500, color: C.text, overflow: 'hidden',
-          textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
-        {item.url && (
-          <a href={item.url} target="_blank" rel="noopener noreferrer"
-            style={{ fontSize: 13, textDecoration: 'none', flexShrink: 0, opacity: 0.5 }}
-            onClick={e => e.stopPropagation()}>📍</a>
-        )}
-      </div>
+        {item.name}
+      </span>
 
-      {/* Right side: tags */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
-        {item.want_photo && (
-          <span style={{ fontSize: 9, fontWeight: 700, color: '#1565c0', background: '#e3f2fd',
-            padding: '2px 5px', borderRadius: 3, letterSpacing: '0.3px' }}>📷</span>
-        )}
-        {item.price != null && (
-          <span style={{ fontSize: 11, fontWeight: 600, color: '#bf360c',
-            fontVariantNumeric: 'tabular-nums' }}>₩{Number(item.price).toLocaleString()}</span>
-        )}
-        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-          color: STATUS_CONFIG[item.status]?.color || C.undecided,
-          background: STATUS_CONFIG[item.status]?.bg || C.undecidedBg }}>
-          {STATUS_CONFIG[item.status]?.icon || '○'}
-        </span>
-        {!readonly && <span style={{ color: C.textLight, fontSize: 14, marginLeft: 2 }}
-          onClick={() => onTap && onTap(item)}>›</span>}
-      </div>
+      {/* Right indicators */}
+      {item.url && (
+        <a href={item.url} target="_blank" rel="noopener noreferrer"
+          style={{ fontSize: 12, textDecoration: 'none', flexShrink: 0, opacity: 0.35 }}
+          onClick={e => e.stopPropagation()}>📍</a>
+      )}
+      {item.want_photo && <span style={{ fontSize: 8, color: '#1565c0', flexShrink: 0 }}>📷</span>}
+      {item.price != null && (
+        <span style={{ fontSize: 10, fontWeight: 600, color: '#bf360c', flexShrink: 0,
+          fontVariantNumeric: 'tabular-nums' }}>₩{(item.price / 1000).toFixed(0)}k</span>
+      )}
+      <span style={{ width: 7, height: 7, borderRadius: 4, background: sc.color, flexShrink: 0 }} />
+      {!readonly && <span style={{ color: C.textLight, fontSize: 12, flexShrink: 0 }}
+        onClick={() => onTap && onTap(item)}>›</span>}
     </div>
   );
 }
@@ -664,17 +662,9 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
         const isDraggedItem = draggingItem && item.id === draggingItem.id;
         const hasPrice = item.price != null;
         const hasPhoto = item.want_photo;
-
-        // Subtle left accent based on state
-        const accent = isDraggedItem ? `3px solid ${C.confirmed}`
-          : hasPhoto ? '3px solid #90caf9'
-          : hasPrice ? '3px solid #ffcc80'
-          : '3px solid transparent';
-
-        const bg = isDraggedItem ? '#f1f8e9'
-          : hasPhoto ? '#f5f9ff'
-          : hasPrice ? '#fffcf5'
-          : '#fff';
+        const isLast = idx === displayItems.length - 1;
+        const nextItem = !isLast ? displayItems[idx + 1] : null;
+        const sameDateAsNext = nextItem && (item.date || null) === (nextItem.date || null);
 
         return (
           <div key={item.id}>
@@ -682,15 +672,21 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
             <div
               data-sort-idx={idx}
               style={{
-                background: bg,
-                borderLeft: accent,
-                borderRadius: 8,
-                padding: '10px 12px',
-                marginBottom: 6,
-                boxShadow: isDraggedItem ? '0 2px 12px rgba(0,0,0,0.08)' : '0 1px 2px rgba(0,0,0,0.03)',
+                display: 'flex', alignItems: 'center', gap: 8,
+                padding: '11px 4px',
+                borderBottom: sameDateAsNext ? `1px solid ${C.borderLight}` : 'none',
+                background: isDraggedItem ? '#f1f8e9' : 'transparent',
                 transition: isDragging ? 'none' : 'all 0.12s ease',
               }}
             >
+              {/* Color accent bar */}
+              <div style={{
+                width: 3, height: 20, borderRadius: 2, flexShrink: 0,
+                background: isDraggedItem ? C.confirmed
+                  : hasPhoto ? '#90caf9'
+                  : hasPrice ? '#ffcc80'
+                  : 'transparent',
+              }} />
               {renderItem(item, idx)}
             </div>
           </div>
@@ -1322,30 +1318,26 @@ export default function PlanManager() {
         </div>
       </div>
 
-      {/* Status Filter Tabs */}
-      <div style={{ padding: '0 16px', maxWidth: 600, margin: '0 auto' }}>
+      {/* Segment Filter */}
+      <div style={{ padding: '0 12px', maxWidth: 600, margin: '0 auto' }}>
         <div style={styles.tabBar}>
           <button style={styles.tab(statusFilter === 'all')} onClick={() => setStatusFilter('all')}>
-            すべて ({items.length})
+            全 {items.length}
           </button>
           {STATUSES.map(s => {
             const count = items.filter(it => it.status === s).length;
             return (
-              <button key={s} style={styles.tab(statusFilter === s)} onClick={() => setStatusFilter(s)}>
-                {STATUS_CONFIG[s].icon} {s} ({count})
+              <button key={s} style={styles.tab(statusFilter === s, STATUS_CONFIG[s].color)}
+                onClick={() => setStatusFilter(s)}>
+                {STATUS_CONFIG[s].icon} {count}
               </button>
             );
           })}
           <button
-            style={{
-              ...styles.tab(statusFilter === 'price'),
-              background: statusFilter === 'price' ? '#e65100' : C.card,
-              color: statusFilter === 'price' ? C.white : C.textSub,
-              borderColor: statusFilter === 'price' ? '#e65100' : C.border,
-            }}
+            style={styles.tab(statusFilter === 'price', '#e65100')}
             onClick={() => setStatusFilter('price')}
           >
-            ₩ 金額あり ({items.filter(it => it.price != null).length})
+            ₩ {items.filter(it => it.price != null).length}
           </button>
         </div>
 
@@ -1356,16 +1348,12 @@ export default function PlanManager() {
           const total = priceItems.reduce((s, it) => s + (it.price || 0), 0);
           return (
             <div style={{
-              background: '#fff8f0', border: '1px solid #ffb74d', borderRadius: 10,
-              padding: '10px 14px', marginTop: 8, display: 'flex',
-              justifyContent: 'space-between', alignItems: 'center',
+              background: '#fffcf5', borderRadius: 6, padding: '6px 12px',
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              fontSize: 12, marginBottom: 4,
             }}>
-              <span style={{ fontSize: 13, color: '#e65100', fontWeight: 600 }}>
-                💰 {priceItems.length}件
-              </span>
-              <span style={{ fontSize: 16, color: '#e65100', fontWeight: 700 }}>
-                合計 ₩{total.toLocaleString()}
-              </span>
+              <span style={{ color: '#bf360c' }}>💰 {priceItems.length}件</span>
+              <span style={{ color: '#bf360c', fontWeight: 700 }}>₩{total.toLocaleString()}</span>
             </div>
           );
         })()}
