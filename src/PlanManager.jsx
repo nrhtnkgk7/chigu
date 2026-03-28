@@ -215,20 +215,19 @@ const styles = {
   modal: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(0,0,0,0.4)',
+    background: 'rgba(0,0,0,0.35)',
     zIndex: 200,
-    display: 'flex',
-    alignItems: 'flex-end',
-    justifyContent: 'center',
+    overflowY: 'auto',
+    WebkitOverflowScrolling: 'touch',
   },
   modalContent: {
     background: C.card,
-    borderRadius: '20px 20px 0 0',
-    width: '100%',
-    maxWidth: 600,
-    maxHeight: '90dvh',
-    overflow: 'auto',
-    padding: '24px 20px 40px',
+    borderRadius: 16,
+    width: 'calc(100% - 24px)',
+    maxWidth: 480,
+    margin: '40px auto 60px',
+    padding: '20px 18px 28px',
+    position: 'relative',
   },
   modalTitle: {
     fontSize: 17,
@@ -240,28 +239,28 @@ const styles = {
   input: {
     width: '100%',
     border: `1px solid ${C.border}`,
-    borderRadius: 10,
-    padding: '12px 14px',
+    borderRadius: 8,
+    padding: '11px 12px',
     fontSize: 16,
     fontFamily: '"Noto Sans JP", sans-serif',
     color: C.text,
-    background: C.bg,
+    background: '#f9f8f5',
     boxSizing: 'border-box',
     outline: 'none',
   },
   textarea: {
     width: '100%',
     border: `1px solid ${C.border}`,
-    borderRadius: 10,
-    padding: '12px 14px',
+    borderRadius: 8,
+    padding: '11px 12px',
     fontSize: 16,
     fontFamily: '"Noto Sans JP", sans-serif',
     color: C.text,
-    background: C.bg,
+    background: '#f9f8f5',
     boxSizing: 'border-box',
     outline: 'none',
     resize: 'vertical',
-    minHeight: 120,
+    minHeight: 80,
   },
   label: {
     display: 'block',
@@ -1521,185 +1520,107 @@ export default function PlanManager() {
       {(modal === 'manual' || modal === 'edit') && (
         <div style={styles.modal} onClick={() => { setModal(null); setEditItem(null); }}>
           <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-            <div style={styles.modalTitle}>
-              {editItem ? 'スポット編集' : 'スポット追加'}
+            {/* Close button */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <span style={{ fontSize: 15, fontWeight: 700, color: C.primary }}>
+                {editItem ? 'スポット編集' : 'スポット追加'}
+              </span>
+              <button onClick={() => { setModal(null); setEditItem(null); }}
+                style={{ ...baseBtn, background: 'none', color: C.textLight, fontSize: 22, padding: '4px 8px' }}>×</button>
             </div>
 
-            {/* NAVER MAP paste for overwrite (edit mode only) */}
+            {/* NAVER MAP overwrite (edit only) */}
             {editItem && (
-              <div style={{ marginBottom: 16, padding: 14, background: C.bg, borderRadius: 12, border: `1px dashed ${C.border}` }}>
-                <div style={{ fontSize: 13, fontWeight: 600, color: C.textSub, marginBottom: 8 }}>
-                  📍 NAVER MAPで上書き
-                </div>
+              <div style={{ marginBottom: 14, padding: 12, background: '#f8f7f4', borderRadius: 10, border: `1px dashed ${C.border}` }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 6 }}>📍 NAVER MAPで上書き</div>
                 <textarea
-                  style={{ ...styles.textarea, minHeight: 80, fontSize: 14 }}
-                  placeholder={`NAVER MAPのコピーを貼り付け\n→ 店名・住所・URLを上書きします`}
+                  style={{ ...styles.textarea, minHeight: 60, fontSize: 14 }}
+                  placeholder="NAVER MAPのコピーを貼り付け"
                   value={pasteText}
                   onChange={e => setPasteText(e.target.value)}
-                  rows={3}
+                  rows={2}
                 />
                 {pasteText && (() => {
                   const p = parseNaverMap(pasteText);
                   return (
-                    <div style={{ marginTop: 8 }}>
-                      <div style={{ fontSize: 12, color: C.textSub, marginBottom: 4 }}>
-                        プレビュー: {p.name || '—'} / {p.address || '—'}
-                      </div>
-                      <button
-                        style={{ ...baseBtn, background: C.accent, color: C.white, padding: '8px 16px', fontSize: 13, marginTop: 4 }}
-                        onClick={() => {
-                          setFormData(prev => ({
-                            ...prev,
-                            name: p.name || prev.name,
-                            url: p.url || prev.url,
-                            address: p.address || prev.address,
-                          }));
-                          setPasteText('');
-                        }}
-                      >上書き反映</button>
-                    </div>
+                    <button
+                      style={{ ...baseBtn, background: C.accent, color: C.white, padding: '6px 14px', fontSize: 12, marginTop: 6 }}
+                      onClick={() => { setFormData(prev => ({ ...prev, name: p.name || prev.name, url: p.url || prev.url, address: p.address || prev.address })); setPasteText(''); }}
+                    >→ {p.name || '—'} を反映</button>
                   );
                 })()}
               </div>
             )}
 
-            <label style={styles.label}>店名 / スポット名 *</label>
-            <input
-              style={styles.input}
-              value={formData.name}
-              onChange={e => setFormData(p => ({ ...p, name: e.target.value }))}
-              placeholder="例: トトス"
-            />
+            {/* Form fields - compact grid */}
+            <input style={{ ...styles.input, marginBottom: 10, fontWeight: 600 }} value={formData.name}
+              onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} placeholder="店名 / スポット名 *" />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-              <div>
-                <label style={styles.label}>日付</label>
-                <input
-                  style={styles.input}
-                  type="date"
-                  value={formData.date}
-                  onChange={e => setFormData(p => ({ ...p, date: e.target.value }))}
-                />
-              </div>
-              <div>
-                <label style={styles.label}>時間</label>
-                <input
-                  style={styles.input}
-                  type="time"
-                  value={formData.time}
-                  onChange={e => setFormData(p => ({ ...p, time: e.target.value }))}
-                />
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+              <input style={styles.input} type="date" value={formData.date}
+                onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} />
+              <input style={styles.input} type="time" value={formData.time}
+                onChange={e => setFormData(p => ({ ...p, time: e.target.value }))} />
             </div>
 
-            <label style={styles.label}>ステータス</label>
-            <div style={{ display: 'flex', gap: 8 }}>
+            {/* Status row */}
+            <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
               {STATUSES.map(s => (
-                <button
-                  key={s}
+                <button key={s}
                   style={{
-                    ...baseBtn,
-                    flex: 1,
-                    padding: '10px 8px',
-                    fontSize: 13,
-                    background: formData.status === s ? STATUS_CONFIG[s].bg : C.bg,
+                    ...baseBtn, flex: 1, padding: '9px 4px', fontSize: 12,
+                    background: formData.status === s ? STATUS_CONFIG[s].bg : '#f5f4f1',
                     color: formData.status === s ? STATUS_CONFIG[s].color : C.textLight,
-                    border: `2px solid ${formData.status === s ? STATUS_CONFIG[s].color : C.border}`,
+                    border: `1.5px solid ${formData.status === s ? STATUS_CONFIG[s].color : 'transparent'}`,
                   }}
                   onClick={() => setFormData(p => ({ ...p, status: s }))}
-                >
-                  {STATUS_CONFIG[s].icon} {s}
-                </button>
+                >{STATUS_CONFIG[s].icon} {s}</button>
               ))}
             </div>
 
-            <label style={styles.label}>ジャンル</label>
-            <input
-              style={styles.input}
-              value={formData.genre}
-              onChange={e => setFormData(p => ({ ...p, genre: e.target.value }))}
-              placeholder="例: 韓国料理、カフェ"
-            />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
+              <input style={styles.input} value={formData.genre}
+                onChange={e => setFormData(p => ({ ...p, genre: e.target.value }))} placeholder="ジャンル" />
+              <input style={styles.input} type="number" inputMode="numeric" value={formData.price}
+                onChange={e => setFormData(p => ({ ...p, price: e.target.value }))} placeholder="金額 ₩" />
+            </div>
 
-            <label style={styles.label}>金額（₩）</label>
-            <input
-              style={styles.input}
-              type="number"
-              inputMode="numeric"
-              value={formData.price}
-              onChange={e => setFormData(p => ({ ...p, price: e.target.value }))}
-              placeholder="例: 15000"
-            />
-
-            {/* Photo tag + date controls */}
-            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+            {/* Toggle buttons row */}
+            <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
               <button
                 style={{
-                  ...baseBtn, flex: 1, padding: '12px', fontSize: 13,
-                  background: formData.want_photo ? '#e3f2fd' : C.bg,
+                  ...baseBtn, flex: 1, padding: '10px', fontSize: 12,
+                  background: formData.want_photo ? '#e3f2fd' : '#f5f4f1',
                   color: formData.want_photo ? '#1565c0' : C.textSub,
-                  border: `2px solid ${formData.want_photo ? '#1565c0' : C.border}`,
+                  border: `1.5px solid ${formData.want_photo ? '#90caf9' : 'transparent'}`,
                 }}
                 onClick={() => setFormData(p => ({ ...p, want_photo: !p.want_photo }))}
-              >
-                📷 {formData.want_photo ? '撮りたい絵 ON' : '撮りたい絵'}
-              </button>
+              >📷 撮りたい絵{formData.want_photo ? ' ✓' : ''}</button>
               {editItem && formData.date && (
                 <button
-                  style={{
-                    ...baseBtn, flex: 1, padding: '12px', fontSize: 13,
-                    background: C.undecidedBg, color: C.undecided,
-                    border: `2px solid ${C.border}`,
-                  }}
+                  style={{ ...baseBtn, flex: 1, padding: '10px', fontSize: 12,
+                    background: '#f5f4f1', color: C.undecided, border: '1.5px solid transparent' }}
                   onClick={() => setFormData(p => ({ ...p, date: '' }))}
-                >
-                  ✕ 日程を未定に戻す
-                </button>
+                >✕ 日程未定に戻す</button>
               )}
             </div>
 
-            <label style={styles.label}>住所</label>
-            <input
-              style={styles.input}
-              value={formData.address}
-              onChange={e => setFormData(p => ({ ...p, address: e.target.value }))}
-              placeholder="住所"
-            />
+            <input style={{ ...styles.input, marginBottom: 8 }} value={formData.address}
+              onChange={e => setFormData(p => ({ ...p, address: e.target.value }))} placeholder="住所" />
+            <input style={{ ...styles.input, marginBottom: 8 }} value={formData.url}
+              onChange={e => setFormData(p => ({ ...p, url: e.target.value }))} placeholder="URL https://..." />
+            <textarea style={{ ...styles.textarea, minHeight: 50, marginBottom: 12 }} value={formData.memo}
+              onChange={e => setFormData(p => ({ ...p, memo: e.target.value }))} placeholder="メモ" rows={2} />
 
-            <label style={styles.label}>URL</label>
-            <input
-              style={styles.input}
-              value={formData.url}
-              onChange={e => setFormData(p => ({ ...p, url: e.target.value }))}
-              placeholder="https://..."
-            />
-
-            <label style={styles.label}>メモ</label>
-            <textarea
-              style={{ ...styles.textarea, minHeight: 60 }}
-              value={formData.memo}
-              onChange={e => setFormData(p => ({ ...p, memo: e.target.value }))}
-              placeholder="メモ"
-              rows={2}
-            />
-
-            <button
-              style={styles.primaryBtn}
-              onClick={handleManualSave}
-              disabled={!formData.name.trim()}
-            >
+            {/* Action buttons */}
+            <button style={styles.primaryBtn} onClick={handleManualSave} disabled={!formData.name.trim()}>
               {editItem ? '保存' : '追加'}
             </button>
-
             {editItem && (
-              <button style={styles.dangerBtn} onClick={() => deleteItem(editItem.id)}>
-                このスポットを削除
+              <button style={{ ...styles.dangerBtn, marginTop: 8 }} onClick={() => deleteItem(editItem.id)}>
+                削除
               </button>
             )}
-
-            <button style={styles.secondaryBtn} onClick={() => { setModal(null); setEditItem(null); }}>
-              キャンセル
-            </button>
           </div>
         </div>
       )}
