@@ -1556,12 +1556,17 @@ export default function PlanManager() {
             <input style={{ ...styles.input, marginBottom: 10, fontWeight: 600 }} value={formData.name}
               onChange={e => setFormData(p => ({ ...p, name: e.target.value }))} placeholder="店名 / スポット名 *" />
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
-              <input style={styles.input} type="date" value={formData.date}
-                onChange={e => setFormData(p => ({ ...p, date: e.target.value }))} />
-              <input style={styles.input} type="time" value={formData.time}
-                onChange={e => setFormData(p => ({ ...p, time: e.target.value }))} />
-            </div>
+            <input style={{ ...styles.input, marginBottom: 10 }} type="datetime-local"
+              value={(formData.date && formData.time) ? `${formData.date}T${formData.time}` : formData.date ? `${formData.date}T00:00` : ''}
+              onChange={e => {
+                const v = e.target.value;
+                if (v) {
+                  const [d, t] = v.split('T');
+                  setFormData(p => ({ ...p, date: d, time: t }));
+                } else {
+                  setFormData(p => ({ ...p, date: '', time: '' }));
+                }
+              }} />
 
             {/* Status row */}
             <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
