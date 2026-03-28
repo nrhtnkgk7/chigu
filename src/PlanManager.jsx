@@ -299,15 +299,16 @@ const styles = {
     marginTop: 10,
   },
   dateHeader: {
-    fontSize: 15,
-    fontWeight: 700,
+    fontSize: 13,
+    fontWeight: 800,
     color: C.primary,
-    padding: '18px 0 8px',
-    borderBottom: `2px solid ${C.primary}`,
-    marginBottom: 10,
+    padding: '20px 0 6px',
+    borderBottom: `1.5px solid ${C.primary}`,
+    marginBottom: 8,
     display: 'flex',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'baseline',
+    letterSpacing: '0.5px',
   },
   itemCard: {
     background: C.card,
@@ -470,144 +471,77 @@ const styles = {
   },
 };
 
-// ── Item Card Component (pure display) ──
-function ItemCard({ item, onTap, readonly, onTimeChange, onDateChange, onTogglePhoto }) {
+// ── Item Card Component (minimal, refined) ──
+function ItemCard({ item, onTap, readonly, onTimeChange }) {
   const [editingTime, setEditingTime] = useState(false);
-  const [editingDate, setEditingDate] = useState(false);
   const [tempTime, setTempTime] = useState(item.time || '');
-  const [tempDate, setTempDate] = useState(item.date || '');
 
   function handleTimeSubmit() {
     if (onTimeChange) onTimeChange(item.id, tempTime || null);
     setEditingTime(false);
   }
-  function handleDateSubmit() {
-    if (onDateChange) onDateChange(item.id, tempDate || null);
-    setEditingDate(false);
-  }
 
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-      {/* Drag Handle - visual only, events handled by parent */}
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '2px 0' }}>
       {!readonly && (
-        <div
-          className="drag-handle"
-          style={{
-            display: 'flex', alignItems: 'center', padding: '8px 2px',
-            color: C.textLight, fontSize: 18, cursor: 'grab', touchAction: 'none',
-            userSelect: 'none', flexShrink: 0, lineHeight: 1,
-          }}
-        >
-          ≡
-        </div>
+        <div className="drag-handle" style={{
+          color: C.textLight, fontSize: 14, cursor: 'grab', touchAction: 'none',
+          userSelect: 'none', flexShrink: 0, opacity: 0.4,
+        }}>⠿</div>
       )}
 
-      {/* Time - tap to edit */}
-      <div style={{ ...styles.itemTime, cursor: readonly ? 'default' : 'pointer' }}>
+      {/* Time */}
+      <div style={{ minWidth: 46, flexShrink: 0 }}>
         {editingTime && !readonly ? (
-          <input
-            type="time"
-            value={tempTime}
+          <input type="time" value={tempTime}
             onChange={e => setTempTime(e.target.value)}
             onBlur={handleTimeSubmit}
             onKeyDown={e => e.key === 'Enter' && handleTimeSubmit()}
             autoFocus
-            style={{
-              width: 64, border: `1px solid ${C.accent}`, borderRadius: 6,
-              padding: '4px 6px', fontSize: 16, fontFamily: '"Noto Sans JP", sans-serif',
-              color: C.primary, background: C.white, outline: 'none',
-            }}
-            onClick={e => e.stopPropagation()}
-          />
+            style={{ width: 58, border: `1.5px solid ${C.accent}`, borderRadius: 5,
+              padding: '3px 4px', fontSize: 14, fontFamily: '"Noto Sans JP", sans-serif',
+              color: C.primary, background: '#fff', outline: 'none' }}
+            onClick={e => e.stopPropagation()} />
         ) : (
-          <span
-            onClick={e => {
-              if (readonly) return;
-              e.stopPropagation();
-              setTempTime(item.time || '');
-              setEditingTime(true);
-            }}
-            style={{
-              padding: '4px 6px', borderRadius: 6,
-              background: !readonly ? C.primaryBg : 'transparent',
-            }}
-          >
+          <span onClick={e => { if (readonly) return; e.stopPropagation(); setTempTime(item.time || ''); setEditingTime(true); }}
+            style={{ fontSize: 14, fontWeight: 700, color: item.time ? C.primary : C.textLight,
+              fontVariantNumeric: 'tabular-nums', cursor: readonly ? 'default' : 'pointer',
+              letterSpacing: '0.5px' }}>
             {item.time || '---'}
           </span>
         )}
       </div>
 
-      {/* Content */}
-      <div style={{ flex: 1, minWidth: 0 }} onClick={() => !readonly && onTap && onTap(item)}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
-          <span style={styles.itemName}>{item.name}</span>
-          {item.url && (
-            <a href={item.url} target="_blank" rel="noopener noreferrer"
-              style={{ fontSize: 16, textDecoration: 'none', flexShrink: 0, display: 'inline-flex', alignItems: 'center' }}
-              onClick={e => e.stopPropagation()} title="地図を開く">📍</a>
-          )}
-          <span style={styles.statusBadge(item.status)}>{item.status}</span>
-          {item.price != null && (
-            <span style={{ fontSize: 12, fontWeight: 600, color: '#e65100' }}>
-              ₩{Number(item.price).toLocaleString()}
-            </span>
-          )}
-          {item.want_photo && (
-            <span style={{ fontSize: 10, fontWeight: 700, color: '#1565c0', background: '#e3f2fd',
-              padding: '2px 6px', borderRadius: 4 }}>📷 撮りたい絵</span>
-          )}
-        </div>
-        {/* Photo tag toggle */}
-        {!readonly && (
-          <div style={{ marginTop: 4 }}>
-            <span
-              onClick={e => { e.stopPropagation(); if (onTogglePhoto) onTogglePhoto(item.id, !item.want_photo); }}
-              style={{ fontSize: 11, cursor: 'pointer', padding: '2px 8px', borderRadius: 6,
-                color: item.want_photo ? '#c62828' : '#1565c0',
-                background: item.want_photo ? '#ffebee' : '#e3f2fd',
-                fontWeight: 600 }}
-            >
-              {item.want_photo ? '📷 タグを外す' : '📷 撮りたい絵'}
-            </span>
-          </div>
-        )}
-        {item.genre && <div style={styles.itemSub}>{item.genre}</div>}
-        {item.memo && <div style={{ ...styles.itemSub, fontStyle: 'italic' }}>{item.memo}</div>}
-
-        {/* Inline date controls */}
-        {!readonly && (
-          <div style={{ marginTop: 6 }}>
-            {!item.date ? (
-              editingDate ? (
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }} onClick={e => e.stopPropagation()}>
-                  <input type="date" value={tempDate} onChange={e => setTempDate(e.target.value)} autoFocus
-                    style={{ border: `1px solid ${C.accent}`, borderRadius: 6, padding: '4px 8px', fontSize: 16,
-                      fontFamily: '"Noto Sans JP", sans-serif', color: C.primary, background: C.white, outline: 'none' }} />
-                  <button onClick={handleDateSubmit}
-                    style={{ border: 'none', background: C.primary, color: C.white, borderRadius: 6,
-                      padding: '4px 10px', fontSize: 12, cursor: 'pointer', fontFamily: '"Noto Sans JP", sans-serif' }}>決定</button>
-                  <button onClick={() => setEditingDate(false)}
-                    style={{ border: `1px solid ${C.border}`, background: C.white, color: C.textSub, borderRadius: 6,
-                      padding: '4px 8px', fontSize: 12, cursor: 'pointer', fontFamily: '"Noto Sans JP", sans-serif' }}>×</button>
-                </div>
-              ) : (
-                <span onClick={e => { e.stopPropagation(); setTempDate(''); setEditingDate(true); }}
-                  style={{ fontSize: 12, color: C.accent, cursor: 'pointer', padding: '2px 8px', borderRadius: 6,
-                    background: C.maybeBg, fontWeight: 600 }}>+ 日付を設定</span>
-              )
-            ) : (
-              <span
-                onClick={e => { e.stopPropagation(); if (onDateChange) onDateChange(item.id, null); }}
-                style={{ fontSize: 11, color: C.undecided, cursor: 'pointer', padding: '2px 8px', borderRadius: 6,
-                  background: C.undecidedBg }}>
-                ✕ 日程を未定に戻す
-              </span>
-            )}
-          </div>
+      {/* Name + indicators */}
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 6 }}
+        onClick={() => !readonly && onTap && onTap(item)}>
+        <span style={{ fontSize: 14, fontWeight: 500, color: C.text, overflow: 'hidden',
+          textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name}</span>
+        {item.url && (
+          <a href={item.url} target="_blank" rel="noopener noreferrer"
+            style={{ fontSize: 13, textDecoration: 'none', flexShrink: 0, opacity: 0.5 }}
+            onClick={e => e.stopPropagation()}>📍</a>
         )}
       </div>
 
-      {!readonly && <span style={styles.chevron} onClick={() => onTap && onTap(item)}>›</span>}
+      {/* Right side: tags */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, flexShrink: 0 }}>
+        {item.want_photo && (
+          <span style={{ fontSize: 9, fontWeight: 700, color: '#1565c0', background: '#e3f2fd',
+            padding: '2px 5px', borderRadius: 3, letterSpacing: '0.3px' }}>📷</span>
+        )}
+        {item.price != null && (
+          <span style={{ fontSize: 11, fontWeight: 600, color: '#bf360c',
+            fontVariantNumeric: 'tabular-nums' }}>₩{Number(item.price).toLocaleString()}</span>
+        )}
+        <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+          color: STATUS_CONFIG[item.status]?.color || C.undecided,
+          background: STATUS_CONFIG[item.status]?.bg || C.undecidedBg }}>
+          {STATUS_CONFIG[item.status]?.icon || '○'}
+        </span>
+        {!readonly && <span style={{ color: C.textLight, fontSize: 14, marginLeft: 2 }}
+          onClick={() => onTap && onTap(item)}>›</span>}
+      </div>
     </div>
   );
 }
@@ -725,11 +659,19 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
     >
       {displayItems.map((item, idx) => {
         const isDraggedItem = draggingItem && item.id === draggingItem.id;
-
         const hasPrice = item.price != null;
         const hasPhoto = item.want_photo;
-        const cardBg = isDraggedItem ? C.confirmedBg : hasPhoto ? '#e8f0fe' : hasPrice ? '#fff8f0' : C.card;
-        const cardBorderLeft = isDraggedItem ? `4px solid ${C.confirmed}` : hasPhoto ? `3px solid #4285f4` : hasPrice ? `3px solid #ffb74d` : `1px solid ${C.borderLight}`;
+
+        // Subtle left accent based on state
+        const accent = isDraggedItem ? `3px solid ${C.confirmed}`
+          : hasPhoto ? '3px solid #90caf9'
+          : hasPrice ? '3px solid #ffcc80'
+          : '3px solid transparent';
+
+        const bg = isDraggedItem ? '#f1f8e9'
+          : hasPhoto ? '#f5f9ff'
+          : hasPrice ? '#fffcf5'
+          : '#fff';
 
         return (
           <div key={item.id}>
@@ -737,11 +679,13 @@ function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHe
             <div
               data-sort-idx={idx}
               style={{
-                ...styles.itemCard,
-                background: cardBg,
-                borderLeft: cardBorderLeft,
-                boxShadow: isDraggedItem ? '0 2px 12px rgba(0,0,0,0.1)' : 'none',
-                transition: isDragging ? 'none' : 'all 0.15s ease',
+                background: bg,
+                borderLeft: accent,
+                borderRadius: 8,
+                padding: '10px 12px',
+                marginBottom: 6,
+                boxShadow: isDraggedItem ? '0 2px 12px rgba(0,0,0,0.08)' : '0 1px 2px rgba(0,0,0,0.03)',
+                transition: isDragging ? 'none' : 'all 0.12s ease',
               }}
             >
               {renderItem(item, idx)}
@@ -772,7 +716,7 @@ export default function PlanManager() {
   // Form states
   const [pasteText, setPasteText] = useState('');
   const [formData, setFormData] = useState({
-    name: '', url: '', address: '', date: '', time: '', status: '未定', genre: '', memo: '', price: '',
+    name: '', url: '', address: '', date: '', time: '', status: '未定', genre: '', memo: '', price: '', want_photo: false,
   });
   const [newProjectName, setNewProjectName] = useState('');
   const [copySuccess, setCopySuccess] = useState(null); // null | 'link' | 'text'
@@ -1062,6 +1006,7 @@ export default function PlanManager() {
       genre: formData.genre || null,
       memo: formData.memo || null,
       price: formData.price !== '' ? parseInt(formData.price) : null,
+      want_photo: formData.want_photo || false,
     };
     if (editItem) {
       updateItem(editItem.id, data);
@@ -1075,7 +1020,7 @@ export default function PlanManager() {
 
   function resetForm() {
     setFormData({
-      name: '', url: '', address: '', date: '', time: '', status: '未定', genre: '', memo: '', price: '',
+      name: '', url: '', address: '', date: '', time: '', status: '未定', genre: '', memo: '', price: '', want_photo: false,
     });
   }
 
@@ -1092,6 +1037,7 @@ export default function PlanManager() {
       genre: item.genre || '',
       memo: item.memo || '',
       price: item.price != null ? String(item.price) : '',
+      want_photo: item.want_photo || false,
     });
     setModal('edit');
   }
@@ -1431,8 +1377,6 @@ export default function PlanManager() {
                     item={item}
                     onTap={openEdit}
                     onTimeChange={handleTimeChange}
-                    onDateChange={handleDateChange}
-                    onTogglePhoto={handleTogglePhoto}
                   />
                 )}
                 renderSectionHeader={(item, idx, allItems) => {
@@ -1686,6 +1630,33 @@ export default function PlanManager() {
               onChange={e => setFormData(p => ({ ...p, price: e.target.value }))}
               placeholder="例: 15000"
             />
+
+            {/* Photo tag + date controls */}
+            <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+              <button
+                style={{
+                  ...baseBtn, flex: 1, padding: '12px', fontSize: 13,
+                  background: formData.want_photo ? '#e3f2fd' : C.bg,
+                  color: formData.want_photo ? '#1565c0' : C.textSub,
+                  border: `2px solid ${formData.want_photo ? '#1565c0' : C.border}`,
+                }}
+                onClick={() => setFormData(p => ({ ...p, want_photo: !p.want_photo }))}
+              >
+                📷 {formData.want_photo ? '撮りたい絵 ON' : '撮りたい絵'}
+              </button>
+              {editItem && formData.date && (
+                <button
+                  style={{
+                    ...baseBtn, flex: 1, padding: '12px', fontSize: 13,
+                    background: C.undecidedBg, color: C.undecided,
+                    border: `2px solid ${C.border}`,
+                  }}
+                  onClick={() => setFormData(p => ({ ...p, date: '' }))}
+                >
+                  ✕ 日程を未定に戻す
+                </button>
+              )}
+            </div>
 
             <label style={styles.label}>住所</label>
             <input
