@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { useParams } from 'react-router-dom';
 
@@ -687,16 +687,17 @@ export default function PlanManager() {
     setLoading(true);
     const { data: proj } = await supabase
       .from('plan_projects')
-      .select('*')
+      .select('id, name, share_id, created_at')
       .eq('share_id', sid)
       .single();
     if (proj) {
       setCurrentProject(proj);
       const { data: its } = await supabase
         .from('plan_items')
-        .select('*')
+        .select('id, project_id, name, url, address, date, time, status, genre, memo, price, want_photo, sort_order')
         .eq('project_id', proj.id)
-        .order('sort_order');
+        .order('sort_order')
+        .limit(500);
       setItems(its || []);
       setView('detail');
     }
@@ -708,8 +709,9 @@ export default function PlanManager() {
     setLoading(true);
     const { data, error } = await supabase
       .from('plan_projects')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('id, name, share_id, created_at')
+      .order('created_at', { ascending: false })
+      .limit(50);
     if (error) {
       console.error('loadProjects error');
       alert('読み込みエラーが発生しました。ページをリロードしてください。');
@@ -773,9 +775,10 @@ export default function PlanManager() {
     setLoading(true);
     const { data } = await supabase
       .from('plan_items')
-      .select('*')
+      .select('id, project_id, name, url, address, date, time, status, genre, memo, price, want_photo, sort_order')
       .eq('project_id', proj.id)
-      .order('sort_order');
+      .order('sort_order')
+      .limit(500);
     setItems(data || []);
     setLoading(false);
   }
@@ -820,12 +823,39 @@ export default function PlanManager() {
 
   async function updateItem(id, updates) {
     if (!rateLimiter('updateItem', 300)) return;
-    await supabase.from('plan_items').update(updates).eq('id', id);
-    setItems(prev => prev.map(it => it.id === id ? { ...it, ...updates } : it));
+    if (!isValidUUID(id)) return;
+    // Whitelist allowed fields
+    const allowed = ['name', 'url', 'address', 'date', 'time', 'status', 'genre', 'memo', 'price', 'want_photo', 'sort_order'];
+    const safe = {};
+    for (const key of allowed) {
+      if (key in updates) {
+        if (key === 'name') safe[key] = sanitize(updates[key], 200);
+        else if (key === 'address') safe[key] = sanitize(updates[key], 500);
+        else if (key === 'genre') safe[key] = sanitize(updates[key], 100);
+        else if (key === 'memo') safe[key] = sanitize(updates[key], 1000);
+        else if (key === 'url') {
+          if (updates[key] && !isValidUrl(updates[key])) continue;
+          safe[key] = updates[key];
+        }
+        else if (key === 'status') {
+          if (!STATUSES.includes(updates[key])) continue;
+          safe[key] = updates[key];
+        }
+        else if (key === 'price') {
+          const p = updates[key];
+          safe[key] = (p != null && p >= 0 && p <= 999999999) ? p : null;
+        }
+        else safe[key] = updates[key];
+      }
+    }
+    if (Object.keys(safe).length === 0) return;
+    await supabase.from('plan_items').update(safe).eq('id', id);
+    setItems(prev => prev.map(it => it.id === id ? { ...it, ...safe } : it));
   }
 
   async function deleteItem(id) {
     if (!rateLimiter('deleteItem', 500)) return;
+    if (!isValidUUID(id)) return;
     await supabase.from('plan_items').delete().eq('id', id);
     setItems(prev => prev.filter(it => it.id !== id));
     setModal(null);
