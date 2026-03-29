@@ -481,7 +481,7 @@ const styles = {
 };
 
 // ── Item Card Component (flat list style) ──
-function ItemCard({ item, onTap, readonly, onTimeChange }) {
+function ItemCard({ item, onTap, readonly, onTimeChange, hidePrivate }) {
   const [editingTime, setEditingTime] = useState(false);
   const [tempTime, setTempTime] = useState(item.time || '');
 
@@ -529,8 +529,8 @@ function ItemCard({ item, onTap, readonly, onTimeChange }) {
           style={{ fontSize: 12, textDecoration: 'none', flexShrink: 0, opacity: 0.35 }}
           onClick={e => e.stopPropagation()}>📍</a>
       )}
-      {item.want_photo && <span style={{ fontSize: 8, color: '#1a5eb8', flexShrink: 0 }}>📷</span>}
-      {item.price != null && (
+      {!hidePrivate && item.want_photo && <span style={{ fontSize: 8, color: '#1a5eb8', flexShrink: 0 }}>📷</span>}
+      {!hidePrivate && item.price != null && (
         <span style={{ fontSize: 10, fontWeight: 600, color: '#c43e00', flexShrink: 0,
           fontVariantNumeric: 'tabular-nums' }}>₩{(item.price / 1000).toFixed(0)}k</span>
       )}
@@ -666,8 +666,8 @@ export default function PlanManager() {
       .select('*')
       .order('created_at', { ascending: false });
     if (error) {
-      console.error('loadProjects error:', error);
-      alert('読み込みエラー: ' + error.message + '\n\nSupabaseでテーブルが作成されているか確認してください。');
+      console.error('loadProjects error');
+      alert('読み込みエラーが発生しました。ページをリロードしてください。');
     }
     setProjects(data || []);
     setLoading(false);
@@ -681,8 +681,7 @@ export default function PlanManager() {
       .select()
       .single();
     if (error) {
-      alert('作成エラー: ' + error.message);
-      console.error('createProject error:', error);
+      alert('作成に失敗しました。もう一度お試しください。');
       return;
     }
     if (data) {
@@ -741,7 +740,7 @@ export default function PlanManager() {
       .select()
       .single();
     if (error) {
-      alert('追加エラー: ' + error.message);
+      alert('追加に失敗しました。');
       return;
     }
     if (data) setItems(prev => [...prev, data]);
@@ -758,7 +757,7 @@ export default function PlanManager() {
       .insert(newItems)
       .select();
     if (error) {
-      alert('一括追加エラー: ' + error.message);
+      alert('一括追加に失敗しました。');
       return;
     }
     if (data) setItems(prev => [...prev, ...data]);
@@ -809,16 +808,26 @@ export default function PlanManager() {
   }
 
   function handleManualSave() {
+    // Input validation
+    const name = (formData.name || '').trim().slice(0, 200);
+    if (!name) return;
+    const url = (formData.url || '').trim();
+    if (url && !/^https?:\/\//i.test(url)) {
+      alert('URLはhttps://で始まる必要があります');
+      return;
+    }
+    const price = formData.price !== '' ? Math.max(0, parseInt(formData.price) || 0) : null;
+
     const data = {
-      name: formData.name,
-      url: formData.url || null,
-      address: formData.address || null,
+      name,
+      url: url || null,
+      address: (formData.address || '').trim().slice(0, 500) || null,
       date: formData.date || null,
       time: formData.time || null,
       status: formData.status,
-      genre: formData.genre || null,
-      memo: formData.memo || null,
-      price: formData.price !== '' ? parseInt(formData.price) : null,
+      genre: (formData.genre || '').trim().slice(0, 100) || null,
+      memo: (formData.memo || '').trim().slice(0, 1000) || null,
+      price,
       want_photo: formData.want_photo || false,
     };
     if (editItem) {
@@ -932,40 +941,59 @@ export default function PlanManager() {
     const el = exportRef.current;
     if (!el) return;
 
-    // Temporarily update export content
     const src = priceOnly ? items.filter(it => it.price != null) : items;
     const { groups: eg, sortedDates: esd, undecided: eu } = groupByDate(src);
     const total = priceOnly ? src.reduce((s, it) => s + (it.price || 0), 0) : null;
 
-    // Build HTML for export
-    let html = `<h1 style="font-size:24px;color:${C.primary};margin-bottom:24px;font-family:'Noto Sans JP',sans-serif">${currentProject?.name}${priceOnly ? ' — 金額一覧' : ''}</h1>`;
-    for (const date of esd) {
-      html += `<div style="font-size:16px;font-weight:700;color:${C.primary};border-bottom:2px solid ${C.primary};padding-bottom:6px;margin-bottom:10px">${formatDate(date)}</div>`;
-      for (const item of eg[date]) {
-        html += `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid ${C.borderLight};font-size:14px;font-family:'Noto Sans JP',sans-serif">`;
-        html += `<span style="width:50px;font-weight:700;color:${C.primary}">${item.time || '---'}</span>`;
-        html += `<span style="flex:1">${item.name}</span>`;
-        if (item.price != null) html += `<span style="color:#e65100;font-weight:600">₩${Number(item.price).toLocaleString()}</span>`;
-        html += `<span style="color:${STATUS_CONFIG[item.status]?.color};font-size:12px">${item.status}</span>`;
-        html += `</div>`;
+    // Build DOM safely (no innerHTML)
+    el.textContent = '';
+    const h1 = document.createElement('h1');
+    h1.textContent = `${currentProject?.name}${priceOnly ? ' — 金額一覧' : ''}`;
+    Object.assign(h1.style, { fontSize: '24px', color: C.primary, marginBottom: '24px', fontFamily: '"Noto Sans JP", sans-serif' });
+    el.appendChild(h1);
+
+    function addSection(dateStr, sectionItems, isUndecided) {
+      const hdr = document.createElement('div');
+      hdr.textContent = isUndecided ? '日程未定' : formatDate(dateStr);
+      Object.assign(hdr.style, { fontSize: '16px', fontWeight: '700', color: isUndecided ? C.undecided : C.primary, borderBottom: `2px solid ${isUndecided ? C.undecided : C.primary}`, paddingBottom: '6px', marginBottom: '10px' });
+      el.appendChild(hdr);
+      for (const item of sectionItems) {
+        const row = document.createElement('div');
+        Object.assign(row.style, { display: 'flex', gap: '12px', padding: '8px 0', borderBottom: `1px solid ${C.borderLight}`, fontSize: '14px', fontFamily: '"Noto Sans JP", sans-serif' });
+        const time = document.createElement('span');
+        time.textContent = item.time || '---';
+        Object.assign(time.style, { width: '50px', fontWeight: '700', color: C.primary });
+        row.appendChild(time);
+        const name = document.createElement('span');
+        name.textContent = item.name;
+        Object.assign(name.style, { flex: '1' });
+        row.appendChild(name);
+        if (item.price != null) {
+          const price = document.createElement('span');
+          price.textContent = `₩${Number(item.price).toLocaleString()}`;
+          Object.assign(price.style, { color: '#e65100', fontWeight: '600' });
+          row.appendChild(price);
+        }
+        const status = document.createElement('span');
+        status.textContent = item.status;
+        Object.assign(status.style, { color: STATUS_CONFIG[item.status]?.color || C.undecided, fontSize: '12px' });
+        row.appendChild(status);
+        el.appendChild(row);
       }
-      html += `<div style="margin-bottom:20px"></div>`;
-    }
-    if (eu.length > 0) {
-      html += `<div style="font-size:16px;font-weight:700;color:${C.undecided};border-bottom:2px solid ${C.undecided};padding-bottom:6px;margin-bottom:10px">日程未定</div>`;
-      for (const item of eu) {
-        html += `<div style="display:flex;gap:12px;padding:8px 0;border-bottom:1px solid ${C.borderLight};font-size:14px;font-family:'Noto Sans JP',sans-serif">`;
-        html += `<span style="width:50px;font-weight:700;color:${C.textLight}">---</span>`;
-        html += `<span style="flex:1">${item.name}</span>`;
-        if (item.price != null) html += `<span style="color:#e65100;font-weight:600">₩${Number(item.price).toLocaleString()}</span>`;
-        html += `</div>`;
-      }
-    }
-    if (total != null) {
-      html += `<div style="margin-top:20px;padding:12px;border-top:2px solid ${C.primary};font-size:16px;font-weight:700;font-family:'Noto Sans JP',sans-serif">合計: ₩${total.toLocaleString()} (${src.length}件)</div>`;
+      const spacer = document.createElement('div');
+      spacer.style.marginBottom = '20px';
+      el.appendChild(spacer);
     }
 
-    el.innerHTML = html;
+    for (const date of esd) addSection(date, eg[date], false);
+    if (eu.length > 0) addSection(null, eu, true);
+
+    if (total != null) {
+      const totalDiv = document.createElement('div');
+      totalDiv.textContent = `合計: ₩${total.toLocaleString()} (${src.length}件)`;
+      Object.assign(totalDiv.style, { marginTop: '20px', padding: '12px', borderTop: `2px solid ${C.primary}`, fontSize: '16px', fontWeight: '700', fontFamily: '"Noto Sans JP", sans-serif' });
+      el.appendChild(totalDiv);
+    }
 
     const html2canvas = (await import('html2canvas')).default;
     el.style.position = 'fixed';
@@ -1035,7 +1063,7 @@ export default function PlanManager() {
             <div key={date}>
               <div style={styles.dateHeader}>{formatDate(date)}</div>
               {groups[date].map(item => (
-                <ItemCard key={item.id} item={item} readonly />
+                <ItemCard key={item.id} item={item} readonly hidePrivate />
               ))}
             </div>
           ))}
@@ -1045,7 +1073,7 @@ export default function PlanManager() {
                 日程未定
               </div>
               {undecided.map(item => (
-                <ItemCard key={item.id} item={item} readonly />
+                <ItemCard key={item.id} item={item} readonly hidePrivate />
               ))}
             </div>
           )}
@@ -1430,7 +1458,7 @@ export default function PlanManager() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginBottom: 10 }}>
               <input style={styles.input} value={formData.genre}
                 onChange={e => setFormData(p => ({ ...p, genre: e.target.value }))} placeholder="ジャンル" />
-              <input style={styles.input} type="number" inputMode="numeric" value={formData.price}
+              <input style={styles.input} type="number" inputMode="numeric" min="0" value={formData.price}
                 onChange={e => setFormData(p => ({ ...p, price: e.target.value }))} placeholder="金額 ₩" />
             </div>
 
