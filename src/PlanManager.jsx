@@ -5,7 +5,48 @@ import { useParams } from 'react-router-dom';
 const SUPABASE_URL = 'https://thukxeznpnwfqtoehyvc.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRodWt4ZXpucG53ZnF0b2VoeXZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI4Mzk1NTMsImV4cCI6MjA4ODQxNTU1M30._ZqXyb1slx-8WNmebptkeTNJdv-aUlJGRAwJZdsFkqo';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  realtime: { params: { eventsPerSecond: 1 } },
+  global: { headers: { 'X-Client-Info': 'chigu-plan' } },
+  db: { schema: 'public' },
+});
+
+// ── Security Utilities ──
+function sanitize(str, maxLen = 500) {
+  if (!str) return '';
+  return str
+    .replace(/[<>]/g, '')           // Strip HTML brackets
+    .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Strip control chars
+    .trim()
+    .slice(0, maxLen);
+}
+
+function isValidUrl(url) {
+  if (!url) return true;
+  try {
+    const u = new URL(url);
+    return u.protocol === 'https:' || u.protocol === 'http:';
+  } catch { return false; }
+}
+
+function isValidUUID(str) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(str);
+}
+
+function isValidShareId(str) {
+  return /^[0-9a-f]{12,64}$/i.test(str);
+}
+
+// Rate limiter: prevent rapid-fire operations
+const rateLimiter = (() => {
+  const last = {};
+  return (key, intervalMs = 500) => {
+    const now = Date.now();
+    if (last[key] && now - last[key] < intervalMs) return false;
+    last[key] = now;
+    return true;
+  };
+})();
 
 // ── Design Tokens ──
 const C = {
@@ -42,35 +83,38 @@ const STATUSES = ['確定', '時間があれば', '未定'];
 
 // ── Parsers ──
 function parseNaverMap(text) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  if (!text || text.length > 5000) return { name: '', url: '', address: '' };
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l).slice(0, 20);
   const result = { name: '', url: '', address: '' };
   const filtered = lines.filter(l =>
     !l.startsWith('[') || !l.includes('NAVER')
   );
   for (const line of filtered) {
-    if (line.match(/^https?:\/\//)) {
-      result.url = line;
+    if (line.match(/^https?:\/\//) && !result.url) {
+      result.url = sanitize(line, 2000);
     } else if (
       line.match(/[시도군구읍면동리로길]/) ||
       line.match(/[市区町村]/) ||
       line.match(/특별시|광역시|특별자치/)
     ) {
-      result.address = line;
+      result.address = sanitize(line, 500);
     } else if (!result.name) {
-      result.name = line;
+      result.name = sanitize(line, 200);
     }
   }
   return result;
 }
 
 function parseBulkSchedule(text, defaultYear) {
-  const lines = text.split('\n').map(l => l.trim()).filter(l => l);
+  if (!text || text.length > 10000) return [];
+  const lines = text.split('\n').map(l => l.trim()).filter(l => l).slice(0, 200);
   const items = [];
   let currentDate = null;
   const year = defaultYear || new Date().getFullYear();
+  const MAX_ITEMS = 100;
 
   for (const line of lines) {
-    // Match: 4/1, 4/1(水), 2025/4/1, 2025/4/1(水)
+    if (items.length >= MAX_ITEMS) break;
     const dateMatch = line.match(/^(\d{4}\/)?(\d{1,2})\/(\d{1,2})(?:\s*[\(（][日月火水木金土][\)）])?$/);
     if (dateMatch) {
       const y = dateMatch[1] ? dateMatch[1].replace('/', '') : year;
@@ -81,14 +125,14 @@ function parseBulkSchedule(text, defaultYear) {
       const timeMatch = line.match(/^(\d{1,2}:\d{2})\s+(.+)$/);
       if (timeMatch) {
         items.push({
-          name: timeMatch[2],
+          name: sanitize(timeMatch[2], 200),
           time: timeMatch[1],
           date: currentDate,
           status: '未定',
         });
       } else if (line.length > 0) {
         items.push({
-          name: line,
+          name: sanitize(line, 200),
           time: null,
           date: currentDate,
           status: '未定',
@@ -639,6 +683,7 @@ export default function PlanManager() {
   }, [shareId]);
 
   async function loadSharedProject(sid) {
+    if (!isValidShareId(sid)) return;
     setLoading(true);
     const { data: proj } = await supabase
       .from('plan_projects')
@@ -675,9 +720,12 @@ export default function PlanManager() {
 
   async function createProject() {
     if (!newProjectName.trim()) return;
+    if (!rateLimiter('createProject', 1000)) return;
+    const safeName = sanitize(newProjectName, 200);
+    if (!safeName) return;
     const { data, error } = await supabase
       .from('plan_projects')
-      .insert({ name: newProjectName.trim() })
+      .insert({ name: safeName })
       .select()
       .single();
     if (error) {
@@ -694,18 +742,23 @@ export default function PlanManager() {
 
   async function updateProjectName(name) {
     if (!name.trim() || !currentProject) return;
+    if (!rateLimiter('updateProject', 500)) return;
+    const safeName = sanitize(name, 200);
+    if (!safeName) return;
     await supabase
       .from('plan_projects')
-      .update({ name: name.trim() })
+      .update({ name: safeName })
       .eq('id', currentProject.id);
-    setCurrentProject(prev => ({ ...prev, name: name.trim() }));
-    setProjects(prev => prev.map(p => p.id === currentProject.id ? { ...p, name: name.trim() } : p));
+    setCurrentProject(prev => ({ ...prev, name: safeName }));
+    setProjects(prev => prev.map(p => p.id === currentProject.id ? { ...p, name: safeName } : p));
     setModal(null);
   }
 
   async function deleteProject() {
     if (!currentProject) return;
+    if (!rateLimiter('deleteProject', 2000)) return;
     if (!window.confirm(`「${currentProject.name}」を削除しますか？`)) return;
+    if (!window.confirm('この操作は取り消せません。本当に削除しますか？')) return;
     await supabase.from('plan_projects').delete().eq('id', currentProject.id);
     setProjects(prev => prev.filter(p => p.id !== currentProject.id));
     setCurrentProject(null);
@@ -729,6 +782,7 @@ export default function PlanManager() {
 
   // ── Items CRUD ──
   async function addItem(itemData) {
+    if (!rateLimiter('addItem', 500)) return;
     const newItem = {
       project_id: currentProject.id,
       sort_order: items.length,
@@ -747,6 +801,7 @@ export default function PlanManager() {
   }
 
   async function addItems(itemsArr) {
+    if (!rateLimiter('addItems', 1000)) return;
     const newItems = itemsArr.map((it, i) => ({
       project_id: currentProject.id,
       sort_order: items.length + i,
@@ -764,11 +819,13 @@ export default function PlanManager() {
   }
 
   async function updateItem(id, updates) {
+    if (!rateLimiter('updateItem', 300)) return;
     await supabase.from('plan_items').update(updates).eq('id', id);
     setItems(prev => prev.map(it => it.id === id ? { ...it, ...updates } : it));
   }
 
   async function deleteItem(id) {
+    if (!rateLimiter('deleteItem', 500)) return;
     await supabase.from('plan_items').delete().eq('id', id);
     setItems(prev => prev.filter(it => it.id !== id));
     setModal(null);
