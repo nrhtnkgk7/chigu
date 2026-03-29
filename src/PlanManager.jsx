@@ -494,12 +494,6 @@ function ItemCard({ item, onTap, readonly, onTimeChange }) {
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%' }}>
-      {!readonly && (
-        <div className="drag-handle" style={{
-          color: C.textLight, fontSize: 14, cursor: 'grab', touchAction: 'none',
-          userSelect: 'none', flexShrink: 0, opacity: 0.3,
-        }}>⠿</div>
-      )}
 
       {/* Time */}
       <div style={{ width: 42, flexShrink: 0 }}>
@@ -535,9 +529,9 @@ function ItemCard({ item, onTap, readonly, onTimeChange }) {
           style={{ fontSize: 12, textDecoration: 'none', flexShrink: 0, opacity: 0.35 }}
           onClick={e => e.stopPropagation()}>📍</a>
       )}
-      {item.want_photo && <span style={{ fontSize: 8, color: '#1565c0', flexShrink: 0 }}>📷</span>}
+      {item.want_photo && <span style={{ fontSize: 8, color: '#1a5eb8', flexShrink: 0 }}>📷</span>}
       {item.price != null && (
-        <span style={{ fontSize: 10, fontWeight: 600, color: '#bf360c', flexShrink: 0,
+        <span style={{ fontSize: 10, fontWeight: 600, color: '#c43e00', flexShrink: 0,
           fontVariantNumeric: 'tabular-nums' }}>₩{(item.price / 1000).toFixed(0)}k</span>
       )}
       <span style={{ width: 10, height: 10, borderRadius: 5, background: sc.color, flexShrink: 0 }} />
@@ -548,143 +542,28 @@ function ItemCard({ item, onTap, readonly, onTimeChange }) {
 }
 
 // ── Sortable List with Touch Drag ──
-function SortableList({ items: flatItems, onReorder, renderItem, renderSectionHeader }) {
-  const [dragIdx, setDragIdx] = useState(null);
-  const [overIdx, setOverIdx] = useState(null);
-  const containerRef = useRef(null);
-  const rectsRef = useRef([]);
-  const dragRef = useRef({ active: false, timer: null, startY: 0, rafId: null, lastOverIdx: -1 });
-
-  function recordRects() {
-    if (!containerRef.current) return;
-    const cards = containerRef.current.querySelectorAll('[data-sort-idx]');
-    rectsRef.current = Array.from(cards).map(el => {
-      const r = el.getBoundingClientRect();
-      return { top: r.top + window.scrollY, height: r.height };
-    });
-  }
-
-  function idxFromY(clientY) {
-    const y = clientY + window.scrollY;
-    for (let i = 0; i < rectsRef.current.length; i++) {
-      const r = rectsRef.current[i];
-      const mid = r.top + r.height / 2;
-      if (y < mid) return i;
-    }
-    return rectsRef.current.length - 1;
-  }
-
-  function cleanup() {
-    clearTimeout(dragRef.current.timer);
-    if (dragRef.current.rafId) cancelAnimationFrame(dragRef.current.rafId);
-    document.body.style.overflow = '';
-    document.body.style.touchAction = '';
-    dragRef.current.active = false;
-    dragRef.current.lastOverIdx = -1;
-    setDragIdx(null);
-    setOverIdx(null);
-  }
-
-  function onTouchStart(e) {
-    const handle = e.target.closest('.drag-handle');
-    if (!handle) return;
-    const el = e.target.closest('[data-sort-idx]');
-    if (!el) return;
-    const idx = parseInt(el.getAttribute('data-sort-idx'));
-    const touch = e.touches[0];
-    dragRef.current.startY = touch.clientY;
-
-    dragRef.current.timer = setTimeout(() => {
-      dragRef.current.active = true;
-      recordRects();
-      setDragIdx(idx);
-      setOverIdx(idx);
-      dragRef.current.lastOverIdx = idx;
-      if (navigator.vibrate) navigator.vibrate(15);
-      document.body.style.overflow = 'hidden';
-      document.body.style.touchAction = 'none';
-    }, 150);
-  }
-
-  function onTouchMove(e) {
-    if (!dragRef.current.active) {
-      const dy = Math.abs(e.touches[0].clientY - dragRef.current.startY);
-      if (dy > 10) clearTimeout(dragRef.current.timer);
-      return;
-    }
-    e.preventDefault();
-    const touch = e.touches[0];
-
-    // Auto-scroll at edges
-    const edge = 80, speed = 12;
-    if (touch.clientY < edge) window.scrollBy(0, -speed);
-    else if (touch.clientY > window.innerHeight - edge) window.scrollBy(0, speed);
-
-    // RAF throttle — only update state once per frame
-    if (dragRef.current.rafId) cancelAnimationFrame(dragRef.current.rafId);
-    dragRef.current.rafId = requestAnimationFrame(() => {
-      const newOver = idxFromY(touch.clientY);
-      if (newOver !== dragRef.current.lastOverIdx) {
-        dragRef.current.lastOverIdx = newOver;
-        setOverIdx(newOver);
-      }
-    });
-  }
-
-  function onTouchEnd() {
-    if (dragRef.current.active && dragIdx !== null && overIdx !== null && dragIdx !== overIdx) {
-      onReorder(dragIdx, overIdx);
-    }
-    cleanup();
-  }
-
-  const displayItems = (() => {
-    if (dragIdx === null || overIdx === null || dragIdx === overIdx) return flatItems;
-    const arr = [...flatItems];
-    const [moved] = arr.splice(dragIdx, 1);
-    arr.splice(overIdx, 0, moved);
-    return arr;
-  })();
-
-  const draggingItem = dragIdx !== null ? flatItems[dragIdx] : null;
-  const isDragging = dragIdx !== null;
-
+function SimpleList({ items: flatItems, renderItem, renderSectionHeader }) {
   return (
-    <div
-      ref={containerRef}
-      onTouchStart={onTouchStart}
-      onTouchMove={onTouchMove}
-      onTouchEnd={onTouchEnd}
-      onTouchCancel={cleanup}
-      style={{ position: 'relative' }}
-    >
-      {displayItems.map((item, idx) => {
-        const isDraggedItem = draggingItem && item.id === draggingItem.id;
+    <div>
+      {flatItems.map((item, idx) => {
         const hasPrice = item.price != null;
         const hasPhoto = item.want_photo;
-        const isLast = idx === displayItems.length - 1;
-        const nextItem = !isLast ? displayItems[idx + 1] : null;
+        const isLast = idx === flatItems.length - 1;
+        const nextItem = !isLast ? flatItems[idx + 1] : null;
         const sameDateAsNext = nextItem && (item.date || null) === (nextItem.date || null);
 
         return (
           <div key={item.id}>
-            {renderSectionHeader && renderSectionHeader(item, idx, displayItems)}
-            <div
-              data-sort-idx={idx}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 8,
-                padding: '11px 4px',
-                borderBottom: sameDateAsNext ? `1px solid ${C.borderLight}` : 'none',
-                background: isDraggedItem ? '#f1f8e9' : 'transparent',
-                transition: isDragging ? 'none' : 'all 0.12s ease',
-              }}
-            >
-              {/* Color accent bar */}
+            {renderSectionHeader && renderSectionHeader(item, idx, flatItems)}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '11px 4px',
+              borderBottom: sameDateAsNext ? `1px solid ${C.borderLight}` : 'none',
+            }}>
               <div style={{
                 width: 3, height: 20, borderRadius: 2, flexShrink: 0,
-                background: isDraggedItem ? C.confirmed
-                  : hasPhoto ? '#90caf9'
-                  : hasPrice ? '#ffcc80'
+                background: hasPhoto ? '#5c9ce6'
+                  : hasPrice ? '#e8a040'
                   : 'transparent',
               }} />
               {renderItem(item, idx)}
@@ -748,73 +627,6 @@ export default function PlanManager() {
     for (const d of sd) for (const it of g[d]) flat.push(it);
     for (const it of u) flat.push(it);
     return flat;
-  }
-
-  async function handleReorder(fromIdx, toIdx) {
-    const flat = buildFlatList();
-    const arr = [...flat];
-    const [moved] = arr.splice(fromIdx, 1);
-    arr.splice(toIdx, 0, moved);
-
-    // Determine new date and time from neighbors
-    const prev = toIdx > 0 ? arr[toIdx - 1] : null;
-    const next = toIdx < arr.length - 1 ? arr[toIdx + 1] : null;
-
-    // Adopt date from nearest neighbor
-    const neighborDate = (prev?.date || next?.date) || moved.date;
-    moved.date = neighborDate;
-
-    // Auto-assign time between neighbors if both have times on same date
-    if (prev?.date === neighborDate && next?.date === neighborDate && prev?.time && next?.time) {
-      moved.time = midpointTime(prev.time, next.time);
-    } else if (prev?.date === neighborDate && prev?.time && (!next || next?.date !== neighborDate)) {
-      // After last item with time: add 30 min
-      moved.time = addMinutes(prev.time, 30);
-    } else if (next?.date === neighborDate && next?.time && (!prev || prev?.date !== neighborDate)) {
-      // Before first item with time: subtract 30 min
-      moved.time = addMinutes(next.time, -30);
-    }
-
-    // Update sort_order for all reordered items
-    const updates = arr.map((it, i) => ({ ...it, sort_order: i }));
-    const updatedIds = new Set(updates.map(u => u.id));
-    const newItems = [
-      ...updates,
-      ...items.filter(it => !updatedIds.has(it.id)),
-    ];
-    setItems(newItems);
-
-    // Persist moved item's date + time + sort_order, others just sort_order
-    for (const it of updates) {
-      if (it.id === moved.id) {
-        await supabase.from('plan_items').update({ sort_order: it.sort_order, date: it.date, time: it.time }).eq('id', it.id);
-      } else {
-        await supabase.from('plan_items').update({ sort_order: it.sort_order }).eq('id', it.id);
-      }
-    }
-  }
-
-  function midpointTime(t1, t2) {
-    const [h1, m1] = t1.split(':').map(Number);
-    const [h2, m2] = t2.split(':').map(Number);
-    const min1 = h1 * 60 + m1;
-    const min2 = h2 * 60 + m2;
-    const mid = Math.round((min1 + min2) / 2);
-    // Round to nearest 5 min
-    const rounded = Math.round(mid / 5) * 5;
-    const h = Math.floor(rounded / 60) % 24;
-    const m = rounded % 60;
-    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  }
-
-  function addMinutes(t, mins) {
-    const [h, m] = t.split(':').map(Number);
-    let total = h * 60 + m + mins;
-    if (total < 0) total = 0;
-    if (total >= 1440) total = 1439;
-    const rh = Math.floor(total / 60);
-    const rm = total % 60;
-    return `${String(rh).padStart(2, '0')}:${String(rm).padStart(2, '0')}`;
   }
 
   // ── Shared View ──
@@ -1399,9 +1211,8 @@ export default function PlanManager() {
 
           return (
             <>
-              <SortableList
+              <SimpleList
                 items={flat}
-                onReorder={handleReorder}
                 renderItem={(item) => (
                   <ItemCard
                     item={item}
