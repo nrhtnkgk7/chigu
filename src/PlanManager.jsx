@@ -540,7 +540,7 @@ function ItemCard({ item, onTap, readonly, onTimeChange }) {
         <span style={{ fontSize: 10, fontWeight: 600, color: '#bf360c', flexShrink: 0,
           fontVariantNumeric: 'tabular-nums' }}>₩{(item.price / 1000).toFixed(0)}k</span>
       )}
-      <span style={{ width: 7, height: 7, borderRadius: 4, background: sc.color, flexShrink: 0 }} />
+      <span style={{ width: 10, height: 10, borderRadius: 5, background: sc.color, flexShrink: 0 }} />
       {!readonly && <span style={{ color: C.textLight, fontSize: 12, flexShrink: 0 }}
         onClick={() => onTap && onTap(item)}>›</span>}
     </div>
