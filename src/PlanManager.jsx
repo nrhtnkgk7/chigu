@@ -48,6 +48,99 @@ const rateLimiter = (() => {
   };
 })();
 
+// ── Weather ──
+const WEATHER_ICONS = {
+  0: '☀️', 1: '🌤', 2: '⛅', 3: '☁️',
+  45: '🌫', 48: '🌫',
+  51: '🌦', 53: '🌧', 55: '🌧', 56: '🌧', 57: '🌧',
+  61: '🌧', 63: '🌧', 65: '🌧💧', 66: '🌧', 67: '🌧',
+  71: '🌨', 73: '🌨', 75: '❄️', 77: '🌨',
+  80: '🌦', 81: '🌧', 82: '⛈', 85: '🌨', 86: '❄️',
+  95: '⛈', 96: '⛈', 99: '⛈',
+};
+
+function weatherLabel(code) {
+  if (code <= 1) return '晴';
+  if (code === 2) return '曇時々晴';
+  if (code === 3) return '曇';
+  if (code >= 51 && code <= 57) return '霧雨';
+  if (code >= 61 && code <= 67) return '雨';
+  if (code >= 71 && code <= 77) return '雪';
+  if (code >= 80 && code <= 82) return 'にわか雨';
+  if (code >= 95) return '雷雨';
+  return '';
+}
+
+function umbrellaNeeded(code, precip, prob) {
+  if (code >= 51 || precip > 0.5 || prob > 50) return '☂️';
+  if (prob > 30) return '🌂';
+  return '';
+}
+
+// Seoul coordinates (default, can extend for other cities)
+const WEATHER_COORDS = { lat: 37.566, lon: 126.978 };
+
+async function fetchWeather(dates) {
+  if (!dates || dates.length === 0) return {};
+  const sorted = [...dates].sort();
+  const start = sorted[0];
+  const end = sorted[sorted.length - 1];
+
+  const now = new Date();
+  const maxDate = new Date(now.getTime() + 16 * 24 * 60 * 60 * 1000);
+  const startDate = new Date(start + 'T00:00:00');
+  if (startDate > maxDate) return {};
+
+  try {
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_COORDS.lat}&longitude=${WEATHER_COORDS.lon}&hourly=temperature_2m,weathercode,precipitation_probability&daily=precipitation_sum&timezone=Asia/Seoul&start_date=${start}&end_date=${end}`;
+    const res = await fetch(url);
+    if (!res.ok) return {};
+    const data = await res.json();
+    if (!data.hourly || !data.daily) return {};
+
+    // Group hourly data by date into AM (6-11) and PM (12-17)
+    const result = {};
+    const hourly = data.hourly;
+
+    data.daily.time.forEach((date, dayIdx) => {
+      const amHours = []; const pmHours = [];
+      for (let h = 0; h < 24; h++) {
+        const idx = dayIdx * 24 + h;
+        if (idx >= hourly.time.length) break;
+        const entry = {
+          temp: hourly.temperature_2m[idx],
+          code: hourly.weathercode[idx],
+          prob: hourly.precipitation_probability[idx],
+        };
+        if (h >= 6 && h < 12) amHours.push(entry);
+        else if (h >= 12 && h < 18) pmHours.push(entry);
+      }
+
+      function summarize(hours) {
+        if (hours.length === 0) return { icon: '❓', temp: 0 };
+        // Use the most common weathercode (mode)
+        const codes = hours.map(h => h.code);
+        const maxCode = codes.reduce((a, b) => a > b ? a : b, 0);
+        const avgTemp = Math.round(hours.reduce((s, h) => s + h.temp, 0) / hours.length);
+        return { icon: WEATHER_ICONS[maxCode] || '❓', temp: avgTemp };
+      }
+
+      const maxProb = Math.max(...[...amHours, ...pmHours].map(h => h.prob || 0));
+      const precipSum = data.daily.precipitation_sum[dayIdx];
+      const worstCode = Math.max(...[...amHours, ...pmHours].map(h => h.code || 0));
+
+      result[date] = {
+        am: summarize(amHours),
+        pm: summarize(pmHours),
+        umbrella: umbrellaNeeded(worstCode, precipSum, maxProb),
+      };
+    });
+    return result;
+  } catch {
+    return {};
+  }
+}
+
 // ── Design Tokens ──
 const C = {
   bg: '#faf7f2',
@@ -647,6 +740,9 @@ export default function PlanManager() {
 
   const exportRef = useRef(null);
 
+  // Weather data
+  const [weather, setWeather] = useState({});
+
   function handleTimeChange(id, time) {
     updateItem(id, { time });
   }
@@ -672,6 +768,15 @@ export default function PlanManager() {
     for (const it of u) flat.push(it);
     return flat;
   }
+
+  // ── Fetch weather when items have dates ──
+  useEffect(() => {
+    const dates = [...new Set(items.map(it => it.date).filter(Boolean))];
+    if (dates.length === 0) return;
+    fetchWeather(dates).then(w => {
+      if (Object.keys(w).length > 0) setWeather(w);
+    });
+  }, [items.map(it => it.date).filter(Boolean).join(',')]);
 
   // ── Shared View ──
   useEffect(() => {
@@ -981,7 +1086,10 @@ export default function PlanManager() {
     const { groups, sortedDates, undecided } = groupByDate(src);
     let text = '';
     for (const date of sortedDates) {
-      text += formatDate(date) + '\n';
+      const wx = weather[date];
+      text += formatDate(date);
+      if (wx) text += ` ${wx.am.icon}${wx.am.temp}° / ${wx.pm.icon}${wx.pm.temp}°${wx.umbrella ? ' ' + wx.umbrella : ''}`;
+      text += '\n';
       for (const item of groups[date]) {
         text += (item.time || '---') + ' ' + item.name;
         if (item.price != null) text += ' ₩' + Number(item.price).toLocaleString();
@@ -1041,7 +1149,8 @@ export default function PlanManager() {
 
     function addSection(dateStr, sectionItems, isUndecided) {
       const hdr = document.createElement('div');
-      hdr.textContent = isUndecided ? '日程未定' : formatDate(dateStr);
+      const wx = !isUndecided && dateStr && weather[dateStr];
+      hdr.textContent = (isUndecided ? '日程未定' : formatDate(dateStr)) + (wx ? ` ${wx.am.icon}${wx.am.temp}° / ${wx.pm.icon}${wx.pm.temp}°` : '');
       Object.assign(hdr.style, { fontSize: '16px', fontWeight: '700', color: isUndecided ? C.undecided : C.primary, borderBottom: `2px solid ${isUndecided ? C.undecided : C.primary}`, paddingBottom: '6px', marginBottom: '10px' });
       el.appendChild(hdr);
       for (const item of sectionItems) {
@@ -1146,14 +1255,27 @@ export default function PlanManager() {
           <span style={styles.headerTitle}>{currentProject.name}</span>
         </div>
         <div style={styles.body}>
-          {sortedDates.map(date => (
-            <div key={date}>
-              <div style={styles.dateHeader}>{formatDate(date)}</div>
-              {groups[date].map(item => (
-                <ItemCard key={item.id} item={item} readonly hidePrivate />
-              ))}
-            </div>
-          ))}
+          {sortedDates.map(date => {
+            const wx = weather[date];
+            return (
+              <div key={date}>
+                <div style={{ ...styles.dateHeader, display: 'flex', alignItems: 'center' }}>
+                  <span>{formatDate(date)}</span>
+                  {wx && (
+                    <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 6, fontSize: 11, fontWeight: 500, color: C.textSub }}>
+                      <span>{wx.am.icon}{wx.am.temp}°</span>
+                      <span style={{ color: '#ddd' }}>/</span>
+                      <span>{wx.pm.icon}{wx.pm.temp}°</span>
+                      {wx.umbrella && <span>{wx.umbrella}</span>}
+                    </div>
+                  )}
+                </div>
+                {groups[date].map(item => (
+                  <ItemCard key={item.id} item={item} readonly hidePrivate />
+                ))}
+              </div>
+            );
+          })}
           {undecided.length > 0 && (
             <div>
               <div style={{ ...styles.dateHeader, color: C.undecided, borderColor: C.undecided }}>
@@ -1338,16 +1460,26 @@ export default function PlanManager() {
                 renderSectionHeader={(item, idx, allItems) => {
                   if (idx === 0 || (allItems[idx - 1].date || null) !== (item.date || null)) {
                     const isUndecided = !item.date;
+                    const wx = !isUndecided && weather[item.date];
+                    const count = allItems.filter(x => (x.date || null) === (item.date || null)).length;
                     return (
                       <div style={{
                         ...styles.dateHeader,
                         color: isUndecided ? C.undecided : C.primary,
                         borderColor: isUndecided ? C.undecided : C.primary,
+                        display: 'flex', alignItems: 'center',
                       }}>
                         <span>{isUndecided ? '📌 日程未定' : formatDate(item.date)}</span>
-                        <span style={{ fontSize: 12, fontWeight: 400, color: C.textSub }}>
-                          {allItems.filter(x => (x.date || null) === (item.date || null)).length}件
-                        </span>
+                        {wx && (
+                          <div style={{ flex: 1, display: 'flex', justifyContent: 'center', gap: 6, fontSize: 11, fontWeight: 500, color: C.textSub }}>
+                            <span>{wx.am.icon}{wx.am.temp}°</span>
+                            <span style={{ color: '#ddd' }}>/</span>
+                            <span>{wx.pm.icon}{wx.pm.temp}°</span>
+                            {wx.umbrella && <span>{wx.umbrella}</span>}
+                          </div>
+                        )}
+                        {!wx && <div style={{ flex: 1 }} />}
+                        <span style={{ fontSize: 11, fontWeight: 400, color: C.textSub }}>{count}件</span>
                       </div>
                     );
                   }
