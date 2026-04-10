@@ -72,8 +72,8 @@ function weatherLabel(code) {
 }
 
 function umbrellaNeeded(code, precip, prob) {
-  if (code >= 51 || precip > 0.5 || prob > 50) return '☂️';
-  if (prob > 30) return '🌂';
+  if (code >= 51 || precip > 1.0 || prob > 60) return '☂️';
+  if (prob > 40) return '🌂';
   return '';
 }
 
@@ -92,13 +92,13 @@ async function fetchWeather(dates) {
   if (startDate > maxDate) return {};
 
   try {
-    const url = `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_COORDS.lat}&longitude=${WEATHER_COORDS.lon}&hourly=temperature_2m,weathercode,precipitation_probability&daily=precipitation_sum&timezone=Asia/Seoul&start_date=${start}&end_date=${end}`;
+    // Use KMA Korea model for Seoul accuracy
+    const url = `https://api.open-meteo.com/v1/forecast?latitude=${WEATHER_COORDS.lat}&longitude=${WEATHER_COORDS.lon}&hourly=temperature_2m,weathercode,precipitation_probability&daily=precipitation_sum&timezone=Asia/Seoul&start_date=${start}&end_date=${end}&models=kma_seamless`;
     const res = await fetch(url);
     if (!res.ok) return {};
     const data = await res.json();
     if (!data.hourly || !data.daily) return {};
 
-    // Group hourly data by date into AM (6-11) and PM (12-17)
     const result = {};
     const hourly = data.hourly;
 
@@ -116,23 +116,29 @@ async function fetchWeather(dates) {
         else if (h >= 12 && h < 18) pmHours.push(entry);
       }
 
+      // Use most common (mode) weathercode, not worst
       function summarize(hours) {
         if (hours.length === 0) return { icon: '❓', temp: 0 };
-        // Use the most common weathercode (mode)
-        const codes = hours.map(h => h.code);
-        const maxCode = codes.reduce((a, b) => a > b ? a : b, 0);
+        const freq = {};
+        hours.forEach(h => { freq[h.code] = (freq[h.code] || 0) + 1; });
+        const modeCode = Number(Object.entries(freq).sort((a, b) => b[1] - a[1])[0][0]);
         const avgTemp = Math.round(hours.reduce((s, h) => s + h.temp, 0) / hours.length);
-        return { icon: WEATHER_ICONS[maxCode] || '❓', temp: avgTemp };
+        return { icon: WEATHER_ICONS[modeCode] || '❓', temp: avgTemp };
       }
 
-      const maxProb = Math.max(...[...amHours, ...pmHours].map(h => h.prob || 0));
+      const allHours = [...amHours, ...pmHours];
+      const maxProb = allHours.length > 0 ? Math.max(...allHours.map(h => h.prob || 0)) : 0;
       const precipSum = data.daily.precipitation_sum[dayIdx];
-      const worstCode = Math.max(...[...amHours, ...pmHours].map(h => h.code || 0));
+      // Use mode code for umbrella too
+      const allCodes = allHours.map(h => h.code || 0);
+      const freqAll = {};
+      allCodes.forEach(c => { freqAll[c] = (freqAll[c] || 0) + 1; });
+      const dominantCode = allCodes.length > 0 ? Number(Object.entries(freqAll).sort((a, b) => b[1] - a[1])[0][0]) : 0;
 
       result[date] = {
         am: summarize(amHours),
         pm: summarize(pmHours),
-        umbrella: umbrellaNeeded(worstCode, precipSum, maxProb),
+        umbrella: umbrellaNeeded(dominantCode, precipSum, maxProb),
       };
     });
     return result;
@@ -680,6 +686,35 @@ function ItemCard({ item, onTap, readonly, onTimeChange, hidePrivate }) {
 
 // ── Sortable List with Touch Drag ──
 function SimpleList({ items: flatItems, renderItem, renderSectionHeader }) {
+  const [now, setNow] = useState(new Date());
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 60000);
+    return () => clearInterval(id);
+  }, []);
+
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const nowStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+
+  function toMin(timeStr) {
+    if (!timeStr) return -1;
+    const [h, m] = timeStr.split(':').map(Number);
+    return h * 60 + m;
+  }
+
+  // Inject keyframes once
+  useEffect(() => {
+    if (document.querySelector('[data-now-anim]')) return;
+    const s = document.createElement('style');
+    s.setAttribute('data-now-anim', '');
+    s.textContent = `
+      @keyframes nowBorder { 0%,100%{border-color:rgba(255,152,0,0.15)} 50%{border-color:rgba(255,152,0,0.5)} }
+      @keyframes nowSlide { 0%{background-position:-200px 0} 100%{background-position:200px 0} }
+      @keyframes nowPulseSoft { 0%,100%{opacity:0.5} 50%{opacity:0.9} }
+    `;
+    document.head.appendChild(s);
+  }, []);
+
   return (
     <div>
       {flatItems.map((item, idx) => {
@@ -689,22 +724,55 @@ function SimpleList({ items: flatItems, renderItem, renderSectionHeader }) {
         const nextItem = !isLast ? flatItems[idx + 1] : null;
         const sameDateAsNext = nextItem && (item.date || null) === (nextItem.date || null);
 
+        const isToday = item.date === todayStr;
+        const itemMin = toMin(item.time);
+        const nextMin = nextItem && nextItem.date === todayStr ? toMin(nextItem.time) : -1;
+
+        const isActiveNow = isToday && itemMin >= 0 && nowMinutes >= itemMin && nowMinutes < itemMin + 30;
+        const showNowLine = isToday && sameDateAsNext && itemMin >= 0 && nextMin >= 0
+          && nowMinutes >= itemMin + 30 && nowMinutes < nextMin;
+
         return (
           <div key={item.id}>
             {renderSectionHeader && renderSectionHeader(item, idx, flatItems)}
+            {/* Card wrapper: C border glow when active */}
             <div style={{
-              display: 'flex', alignItems: 'center', gap: 8,
-              padding: '11px 4px',
-              borderBottom: sameDateAsNext ? `1px solid ${C.borderLight}` : 'none',
+              ...(isActiveNow ? {
+                border: '1.5px solid rgba(255,152,0,0.3)',
+                borderRadius: 10,
+                margin: '4px 0',
+                padding: '0 4px',
+                animation: 'nowBorder 2.5s ease-in-out infinite',
+              } : {
+                borderBottom: showNowLine ? 'none' : sameDateAsNext ? `1px solid ${C.borderLight}` : 'none',
+              }),
             }}>
-              <div style={{
-                width: 3, height: 20, borderRadius: 2, flexShrink: 0,
-                background: hasPhoto ? '#5c9ce6'
-                  : hasPrice ? '#e8a040'
-                  : 'transparent',
-              }} />
-              {renderItem(item, idx)}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 4px' }}>
+                <div style={{
+                  width: 3, height: 20, borderRadius: 2, flexShrink: 0,
+                  background: hasPhoto ? '#5c9ce6'
+                    : hasPrice ? '#e8a040'
+                    : 'transparent',
+                }} />
+                {renderItem(item, idx)}
+              </div>
             </div>
+            {/* D flowing light line */}
+            {showNowLine && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 4px' }}>
+                <span style={{
+                  fontSize: 10, color: '#ff9800', fontWeight: 700, flexShrink: 0,
+                  animation: 'nowPulseSoft 2s ease-in-out infinite',
+                }}>{nowStr}</span>
+                <div style={{
+                  flex: 1, height: 2, borderRadius: 1,
+                  background: 'linear-gradient(90deg, transparent, #ff9800, transparent)',
+                  backgroundSize: '200px 2px',
+                  backgroundRepeat: 'no-repeat',
+                  animation: 'nowSlide 2.5s ease-in-out infinite',
+                }} />
+              </div>
+            )}
           </div>
         );
       })}
@@ -716,6 +784,37 @@ function SimpleList({ items: flatItems, renderItem, renderSectionHeader }) {
 export default function PlanManager() {
   const params = useParams();
   const shareId = params.shareId || null;
+
+  // 5-tap gate (skip for shared view)
+  const [unlocked, setUnlocked] = useState(!!shareId);
+  const tapRef = useRef({ count: 0, timer: null });
+
+  function handleGateTap(e) {
+    if (e) e.preventDefault();
+    tapRef.current.count++;
+    clearTimeout(tapRef.current.timer);
+    if (tapRef.current.count >= 5) {
+      tapRef.current.count = 0;
+      setUnlocked(true);
+      return;
+    }
+    tapRef.current.timer = setTimeout(() => { tapRef.current.count = 0; }, 2000);
+  }
+
+  if (!unlocked) {
+    return (
+      <div
+        onClick={handleGateTap}
+        onTouchEnd={handleGateTap}
+        style={{
+          position: 'fixed', inset: 0, background: '#fff', zIndex: 9999,
+          WebkitTapHighlightColor: 'transparent',
+          userSelect: 'none', WebkitUserSelect: 'none',
+          touchAction: 'manipulation',
+        }}
+      />
+    );
+  }
 
   const [view, setView] = useState('projects'); // projects | detail
   const [projects, setProjects] = useState([]);
@@ -737,6 +836,7 @@ export default function PlanManager() {
   const [copySuccess, setCopySuccess] = useState(null); // null | 'link' | 'text'
   const [exportIncludeUrl, setExportIncludeUrl] = useState(false);
   const [exportPriceOnly, setExportPriceOnly] = useState(false);
+  const [shareFilter, setShareFilter] = useState('all'); // 'all' | 'future'
 
   const exportRef = useRef(null);
 
@@ -986,6 +1086,8 @@ export default function PlanManager() {
       status: '未定',
       genre: '',
       memo: '',
+      price: '',
+      want_photo: false,
     });
     setPasteText('');
     setModal('manual');
@@ -1008,7 +1110,9 @@ export default function PlanManager() {
       alert('URLはhttps://で始まる必要があります');
       return;
     }
-    const price = formData.price !== '' ? Math.max(0, parseInt(formData.price) || 0) : null;
+    const price = (formData.price != null && formData.price !== '' && String(formData.price).trim() !== '')
+      ? Math.max(0, parseInt(formData.price) || 0)
+      : null;
 
     const data = {
       name,
@@ -1255,7 +1359,34 @@ export default function PlanManager() {
           <span style={styles.headerTitle}>{currentProject.name}</span>
         </div>
         <div style={styles.body}>
-          {sortedDates.map(date => {
+          {/* Date range toggle */}
+          <div style={{ padding: '0 12px' }}>
+            <div style={{
+              display: 'flex', background: '#ece8e3', borderRadius: 8, padding: 2, margin: '8px 0',
+            }}>
+              <button onClick={() => setShareFilter('all')} style={{
+                border: 'none', borderRadius: 6, padding: '7px 0', fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', flex: 1, fontFamily: '"Noto Sans JP", sans-serif',
+                background: shareFilter === 'all' ? '#fff' : 'transparent',
+                color: shareFilter === 'all' ? C.primary : C.textLight,
+                boxShadow: shareFilter === 'all' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              }}>全日程</button>
+              <button onClick={() => setShareFilter('future')} style={{
+                border: 'none', borderRadius: 6, padding: '7px 0', fontSize: 11, fontWeight: 600,
+                cursor: 'pointer', flex: 1, fontFamily: '"Noto Sans JP", sans-serif',
+                background: shareFilter === 'future' ? '#fff' : 'transparent',
+                color: shareFilter === 'future' ? C.primary : C.textLight,
+                boxShadow: shareFilter === 'future' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
+              }}>今日以降</button>
+            </div>
+          </div>
+          {(() => {
+            const today = new Date();
+            const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+            const visibleDates = shareFilter === 'future'
+              ? sortedDates.filter(d => d >= todayStr)
+              : sortedDates;
+            return visibleDates.map(date => {
             const wx = weather[date];
             return (
               <div key={date}>
@@ -1275,7 +1406,8 @@ export default function PlanManager() {
                 ))}
               </div>
             );
-          })}
+          });
+          })()}
           {undecided.length > 0 && (
             <div>
               <div style={{ ...styles.dateHeader, color: C.undecided, borderColor: C.undecided }}>
