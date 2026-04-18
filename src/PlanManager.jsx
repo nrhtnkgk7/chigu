@@ -669,9 +669,20 @@ function ItemCard({ item, onTap, readonly, onTimeChange, hidePrivate }) {
 
       {/* Right indicators */}
       {item.url && (
-        <a href={item.url} target="_blank" rel="noopener noreferrer"
-          style={{ fontSize: 12, textDecoration: 'none', flexShrink: 0, opacity: 0.35 }}
-          onClick={e => e.stopPropagation()}>📍</a>
+        <a href={item.url} rel="noopener noreferrer"
+          style={{ fontSize: 16, textDecoration: 'none', flexShrink: 0, opacity: 0.45,
+            padding: '6px', margin: '-6px', display: 'flex', alignItems: 'center' }}
+          onClick={e => {
+            e.preventDefault();
+            e.stopPropagation();
+            const url = item.url;
+            const isMap = /maps\.app\.goo\.gl|google\.\w+\/maps|map\.naver|naver\.me/i.test(url);
+            if (isMap) {
+              window.location.href = url;
+            } else {
+              window.open(url, '_blank');
+            }
+          }}>📍</a>
       )}
       {!hidePrivate && item.want_photo && <span style={{ fontSize: 8, color: '#1a5eb8', flexShrink: 0 }}>📷</span>}
       {!hidePrivate && item.price != null && (
