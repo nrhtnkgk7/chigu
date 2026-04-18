@@ -785,37 +785,6 @@ export default function PlanManager() {
   const params = useParams();
   const shareId = params.shareId || null;
 
-  // 5-tap gate (skip for shared view)
-  const [unlocked, setUnlocked] = useState(!!shareId);
-  const tapRef = useRef({ count: 0, timer: null });
-
-  function handleGateTap(e) {
-    if (e) e.preventDefault();
-    tapRef.current.count++;
-    clearTimeout(tapRef.current.timer);
-    if (tapRef.current.count >= 5) {
-      tapRef.current.count = 0;
-      setUnlocked(true);
-      return;
-    }
-    tapRef.current.timer = setTimeout(() => { tapRef.current.count = 0; }, 2000);
-  }
-
-  if (!unlocked) {
-    return (
-      <div
-        onClick={handleGateTap}
-        onTouchEnd={handleGateTap}
-        style={{
-          position: 'fixed', inset: 0, background: '#fff', zIndex: 9999,
-          WebkitTapHighlightColor: 'transparent',
-          userSelect: 'none', WebkitUserSelect: 'none',
-          touchAction: 'manipulation',
-        }}
-      />
-    );
-  }
-
   const [view, setView] = useState('projects'); // projects | detail
   const [projects, setProjects] = useState([]);
   const [currentProject, setCurrentProject] = useState(null);
