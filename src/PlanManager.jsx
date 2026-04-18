@@ -190,7 +190,8 @@ function parseNaverMap(text) {
   );
   for (const line of filtered) {
     if (line.match(/^https?:\/\//) && !result.url) {
-      result.url = sanitize(line, 2000);
+      // Strip Google Maps tracking params
+      result.url = sanitize(line.split('?g_st=')[0], 2000);
     } else if (
       line.match(/[시도군구읍면동리로길]/) ||
       line.match(/[市区町村]/) ||
@@ -1606,7 +1607,7 @@ export default function PlanManager() {
               <button style={styles.actionOption} onClick={() => { setModal('naver'); setPasteText(''); }}>
                 <span style={styles.actionIcon}>📍</span>
                 <div>
-                  <div style={{ fontWeight: 600 }}>NAVER MAP 貼り付け</div>
+                  <div style={{ fontWeight: 600 }}>MAP 貼り付け</div>
                   <div style={{ fontSize: 12, color: C.textSub }}>コピペで店名・URL・住所を自動取得</div>
                 </div>
               </button>
@@ -1634,9 +1635,10 @@ export default function PlanManager() {
       {modal === 'naver' && (
         <div style={styles.modal} onClick={() => setModal(null)}>
           <div style={styles.modalContent} onClick={e => e.stopPropagation()}>
-            <div style={styles.modalTitle}>NAVER MAP 貼り付け</div>
+            <div style={styles.modalTitle}>MAP 貼り付け</div>
             <div style={{ fontSize: 12, color: C.textSub, marginBottom: 12, lineHeight: 1.6 }}>
-              NAVER MAPからコピーした内容をそのまま貼り付けてください。店名・住所・URLを自動で取り出します。
+              NAVER MAP または Google MAP からコピーした内容を貼り付けてください。
+Google MAPの場合は「店名」と「URL」を2行で貼り付けてください。
             </div>
             <textarea
               style={styles.textarea}
@@ -1722,10 +1724,10 @@ export default function PlanManager() {
             {/* NAVER MAP overwrite (edit only) */}
             {editItem && (
               <div style={{ marginBottom: 14, padding: 12, background: '#f8f7f4', borderRadius: 10, border: `1px dashed ${C.border}` }}>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 6 }}>📍 NAVER MAPで上書き</div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 6 }}>📍 MAP情報で上書き</div>
                 <textarea
                   style={{ ...styles.textarea, minHeight: 60, fontSize: 14 }}
-                  placeholder="NAVER MAPのコピーを貼り付け"
+                  placeholder="NAVER or Google MAPを貼り付け"
                   value={pasteText}
                   onChange={e => setPasteText(e.target.value)}
                   rows={2}
