@@ -988,13 +988,24 @@ export default function App(){
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/curry" element={<CurryCalculator />} />
-        <Route path="/p" element={<PlanManager />} />
         <Route path="/p/s/:shareId" element={<PlanManager />} />
-        <Route path="*" element={<AppLocked />} />
+        <Route path="*" element={<TapGate><Routes><Route path="/curry" element={<CurryCalculator />} /><Route path="/p" element={<PlanManager />} /><Route path="*" element={<AppLocked />} /></Routes></TapGate>} />
       </Routes>
     </BrowserRouter>
   );
+}
+function TapGate({ children }) {
+  const [unlocked, setUnlocked] = useState(false);
+  const tapRef = useRef({ count: 0, timer: null });
+  function handleTap(e) {
+    if (e) e.preventDefault();
+    tapRef.current.count++;
+    clearTimeout(tapRef.current.timer);
+    if (tapRef.current.count >= 5) { tapRef.current.count = 0; setUnlocked(true); return; }
+    tapRef.current.timer = setTimeout(() => { tapRef.current.count = 0; }, 2000);
+  }
+  if (!unlocked) return <div onClick={handleTap} onTouchEnd={handleTap} style={{ position:'fixed',inset:0,background:'#fff',zIndex:9999,WebkitTapHighlightColor:'transparent',userSelect:'none',WebkitUserSelect:'none',touchAction:'manipulation' }} />;
+  return children;
 }
 function AppLocked(){
   const [unlocked,setUnlocked]=useState(false);
